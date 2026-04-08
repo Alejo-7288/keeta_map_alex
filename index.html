@@ -346,6 +346,18 @@
       white-space: nowrap;
     }
     #back-btn:hover { background: var(--bg); border-color: var(--primary); color: var(--primary); }
+    #gps-btn {
+      background: white;
+      border: 1.5px solid var(--border);
+      border-radius: 10px;
+      padding: 8px 12px;
+      font-size: 16px;
+      cursor: pointer;
+      opacity: 0.7;
+      transition: all 0.2s;
+    }
+    #gps-btn:hover { opacity: 1; background: var(--bg); }
+    #gps-btn:active { opacity: 1; }
 
     /* Route Info Panel */
     #route-info-panel {
@@ -732,7 +744,9 @@
       <i class="fa-solid fa-arrow-left"></i> 返回選擇
     </button>
     <h2>🗺️ 路線地圖</h2>
-    <span id="map-selected-count">0 間餐廳</span>
+    <button id="gps-btn" onclick="toggleGPS()" style="background:none;border:none;cursor:pointer;font-size:20px;padding:4px;" title="開啟 GPS 追蹤">
+      📍
+    </button>
   </div>
 
   <!-- Map + Route Sidebar -->
@@ -1066,14 +1080,16 @@ function getCurrentLocation() {
       const lat = pos.coords.latitude;
       const lng = pos.coords.longitude;
       showToast(`📍 位置：${lat.toFixed(5)}, ${lng.toFixed(5)}`);
-      // Add as a waypoint if in map view
       if (document.getElementById('view-map').classList.contains('active') && map) {
-        L.marker([lat, lng], {
-          icon: L.divIcon({
-            html: '<div style="background:#22c55e;color:white;width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;border:3px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.3);"><i class="fa-solid fa-user"></i></div>',
-            className: '', iconSize: [28, 28], iconAnchor: [14, 14]
-          })
-        }).addTo(map).bindPopup('📍 我的位置').openPopup();
+        const icon = L.divIcon({
+          html: '<div style="background:#22c55e;color:white;width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;border:3px solid white;box-shadow:0 2px 8px rgba(0,0,0,0.3);"><i class="fa-solid fa-user"></i></div>',
+          className: '', iconSize: [32, 32], iconAnchor: [16, 16]
+        });
+        if (window.gpsMarker) {
+          window.gpsMarker.setLatLng([lat, lng]);
+        } else {
+          window.gpsMarker = L.marker([lat, lng], { icon }).addTo(map).bindPopup('📍 我的位置');
+        }
         map.setView([lat, lng], 15);
       }
     },
@@ -1083,6 +1099,82 @@ function getCurrentLocation() {
     },
     { enableHighAccuracy: true, timeout: 10000 }
   );
+}
+
+let gpsWatchId = null;
+let gpsActive = false;
+
+function toggleGPS() {
+  if (!navigator.geolocation) {
+    showToast('❌ 你的瀏覽器不支援定位功能');
+    return;
+  }
+  
+  if (gpsActive) {
+    // Stop GPS tracking
+    if (gpsWatchId !== null) {
+      navigator.geolocation.clearWatch(gpsWatchId);
+      gpsWatchId = null;
+    }
+    gpsActive = false;
+    document.getElementById('gps-btn').style.opacity = '0.5';
+    showToast('📍 GPS 追蹤已關閉');
+  } else {
+    // Start GPS tracking
+    showToast('📍 正在開啟 GPS 追蹤...');
+    
+    if (gpsWatchId !== null) {
+      navigator.geolocation.clearWatch(gpsWatchId);
+    }
+    
+    gpsWatchId = navigator.geolocation.watchPosition(
+      (pos) => {
+        const lat = pos.coords.latitude;
+        const lng = pos.coords.longitude;
+        const accuracy = pos.coords.accuracy;
+        
+        if (!document.getElementById('view-map').classList.contains('active')) return;
+        
+        const icon = L.divIcon({
+          html: '<div style="background:#22c55e;color:white;width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;border:3px solid white;box-shadow:0 2px 8px rgba(0,0,0,0.3);"><i class="fa-solid fa-location-crosshairs"></i></div>',
+          className: '', iconSize: [32, 32], iconAnchor: [16, 16]
+        });
+        
+        if (window.gpsMarker) {
+          window.gpsMarker.setLatLng([lat, lng]);
+        } else {
+          window.gpsMarker = L.marker([lat, lng], { icon }).addTo(map).bindPopup('📍 我的位置');
+        }
+        
+        // Update accuracy circle
+        if (window.gpsCircle) {
+          window.gpsCircle.setLatLng([lat, lng]);
+          window.gpsCircle.setRadius(accuracy);
+        } else {
+          window.gpsCircle = L.circle([lat, lng], {
+            radius: accuracy,
+            color: '#22c55e',
+            fillColor: '#22c55e',
+            fillOpacity: 0.1,
+            weight: 1
+          }).addTo(map);
+        }
+        
+        // Auto-follow user
+        map.setView([lat, lng], 16);
+      },
+      (err) => {
+        showToast('❌ GPS 追蹤失敗，請檢查定位權限');
+        gpsActive = false;
+        document.getElementById('gps-btn').style.opacity = '0.5';
+      },
+      { enableHighAccuracy: true, maximumAge: 1000 }
+    );
+    
+    gpsActive = true;
+    document.getElementById('gps-btn').style.opacity = '1';
+    showToast('📍 GPS 追蹤已開啟');
+  }
 }
 
 // ══════════════════════════════════════════
@@ -1117,6 +1209,15 @@ function toggleRouteSidebar() {
 }
 
 function switchToSelection() {
+  // Stop GPS tracking when leaving map view
+  if (gpsActive) {
+    if (gpsWatchId !== null) {
+      navigator.geolocation.clearWatch(gpsWatchId);
+      gpsWatchId = null;
+    }
+    gpsActive = false;
+    document.getElementById('gps-btn').style.opacity = '0.5';
+  }
   document.getElementById('view-selection').classList.remove('hidden');
   document.getElementById('view-map').classList.remove('active');
 }
