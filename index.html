@@ -536,9 +536,22 @@
 
     /* Map responsive */
     @media (max-width: 768px) {
-      #filter-panel { width: 100%; height: auto; flex: 1; }
-      #view-selection { flex-direction: column; }
-      #route-sidebar { width: 100%; height: 200px; }
+      #view-selection {
+        flex-direction: column;
+        height: auto;
+        min-height: 100vh;
+      }
+      #filter-panel {
+        width: 100%;
+        height: auto;
+        min-height: 50vh;
+        border-right: none;
+        border-bottom: 1px solid var(--border);
+      }
+      /* Hide map and route sidebar in selection view on mobile */
+      #view-selection > div[style*="flex:1"] {
+        display: none !important;
+      }
     }
   </style>
 </head>
