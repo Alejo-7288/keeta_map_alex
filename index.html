@@ -1106,13 +1106,40 @@ function switchToSelection() {
 // ══════════════════════════════════════════
 function initMap() {
   if (map) { map.invalidateSize(); return; }
-  map = L.map('map').setView([22.3193, 114.1694], 12);
+  map = L.map('map', { zoomControl: true, attributionControl: true }).setView([22.3193, 114.1694], 12);
   
-  // Use ESRI tiles directly (more reliable)
-  L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', {
-    attribution: '© Esri',
-    maxZoom: 19
-  }).addTo(map);
+  // Try multiple tile sources
+  const tileSources = [
+    'https://a.tile.openstreetmap.org/{z}/{x}/{y}.png',
+    'https://b.tile.openstreetmap.org/{z}/{x}/{y}.png',
+    'https://c.tile.openstreetmap.org/{z}/{x}/{y}.png'
+  ];
+  
+  let currentSource = 0;
+  
+  function addTileLayer() {
+    const url = tileSources[currentSource];
+    console.log('Trying tile source:', url);
+    
+    const tileLayer = L.tileLayer(url, {
+      attribution: '© OpenStreetMap',
+      maxZoom: 19,
+      errorTileUrl: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII='
+    });
+    
+    tileLayer.on('tileerror', function(e) {
+      console.log('Tile error for source', currentSource, e);
+      if (currentSource < tileSources.length - 1) {
+        currentSource++;
+        map.removeLayer(tileLayer);
+        addTileLayer();
+      }
+    });
+    
+    tileLayer.addTo(map);
+  }
+  
+  addTileLayer();
 }
 
 function renderRouteStops() {
