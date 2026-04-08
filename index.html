@@ -587,6 +587,11 @@
         height: 40vh !important;
         width: 100% !important;
       }
+      .leaflet-container {
+        height: 100% !important;
+        min-height: 40vh !important;
+        width: 100% !important;
+      }
       /* Right panel hidden on mobile */
       #view-selection > div:last-child {
         display: none !important;
@@ -741,8 +746,8 @@
   </div>
 
   <!-- Map + Route Sidebar -->
-  <div style="flex:1;display:flex;overflow:hidden;">
-    <div id="map" style="flex:1;"></div>
+  <div style="flex:1;display:flex;overflow:hidden;height:100%;">
+    <div id="map" style="flex:1;min-height:300px;height:100%;"></div>
 
     <!-- Route Sidebar -->
     <div id="route-sidebar">
