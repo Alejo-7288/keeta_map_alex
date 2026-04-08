@@ -802,6 +802,12 @@
 <!-- Toast -->
 <div id="toast"></div>
 
+<!-- Floating Route Button (shows when 2+ restaurants selected) -->
+<button id="floating-route-btn" onclick="switchToMap()" style="display:none;">
+  <i class="fa-solid fa-map-location-dot"></i>
+  查看路線地圖 (<span id="floating-count">0</span>)
+</button>
+
 <!-- Leaflet JS -->
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
@@ -1031,7 +1037,7 @@ function updateSelectionUI() {
   if (routePrev) routePrev.textContent = count;
   if (floatCount) floatCount.textContent = count;
   if (mapCount) mapCount.textContent = `${count} 間餐廳`;
-  if (floatBtn) floatBtn.classList.toggle('show', count > 0);
+  if (floatBtn) floatBtn.classList.toggle('show', count >= 2);
   if (calcBtn) calcBtn.disabled = count < 2;
 
   // Preview panel
