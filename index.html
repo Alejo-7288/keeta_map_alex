@@ -583,16 +583,11 @@
       }
       #map {
         flex: 1 !important;
-        min-height: 300px !important;
-        height: 300px !important;
-        width: 100% !important;
-        display: block !important;
-      }
-      .leaflet-container {
-        height: 300px !important;
-        min-height: 300px !important;
+        min-height: 0 !important;
+        height: auto !important;
         width: 100% !important;
       }
+
       /* Right panel hidden on mobile */
       #view-selection > div:last-child {
         display: none !important;
@@ -747,8 +742,8 @@
   </div>
 
   <!-- Map + Route Sidebar -->
-  <div style="flex:1;display:flex;overflow:hidden;height:100%;">
-    <div id="map" style="flex:1;min-height:300px;height:100%;"></div>
+  <div style="flex:1;display:flex;overflow:hidden;">
+    <div id="map" style="flex:1;"></div>
 
     <!-- Route Sidebar -->
     <div id="route-sidebar">
@@ -1178,14 +1173,9 @@ function switchToMap() {
   document.getElementById('view-selection').classList.add('hidden');
   document.getElementById('view-map').classList.add('active');
   document.getElementById('route-sidebar').classList.add('show');
-  // Wait for DOM to update before initializing map
-  requestAnimationFrame(() => {
-    requestAnimationFrame(() => {
-      initMap();
-      renderRouteStops();
-      drawRoute();
-    });
-  });
+  initMap();
+  renderRouteStops();
+  drawRoute();
 }
 
 function switchToSelection() {
@@ -1198,27 +1188,10 @@ function switchToSelection() {
 // ══════════════════════════════════════════
 function initMap() {
   if (map) { map.invalidateSize(); return; }
-  // Force map container to have explicit size before initializing Leaflet
-  const mapEl = document.getElementById('map');
-  if (!mapEl) return;
-  mapEl.style.height = '300px';
-  mapEl.style.minHeight = '300px';
-  mapEl.style.width = '100%';
-  mapEl.style.display = 'block';
-  
-  map = L.map('map', { 
-    preferCanvas: true,
-    zoomControl: true
-  }).setView([22.3193, 114.1694], 12);
-  
+  map = L.map('map').setView([22.3193, 114.1694], 12);
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution: '© OpenStreetMap'
   }).addTo(map);
-  
-  // iOS Safari: ensure tiles render after container is visible
-  setTimeout(() => {
-    if (map) map.invalidateSize();
-  }, 500);
 }
 
 function renderRouteStops() {
