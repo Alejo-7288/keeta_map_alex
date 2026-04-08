@@ -596,7 +596,7 @@
     }
   </style>
 </head>
-<body onload="document.getElementById('restaurant-list').innerHTML='<div class=\"loading-row\"><i class=\"🔄 fa-spin\"></i><br/>正在載入...</div>'">
+<div id="debug-ts" style="display:none">1775675593</div><body onload="window.__ts=1775675593;document.getElementById('restaurant-list').innerHTML='<div class=\"loading-row\"><i class=\"🔄 fa-spin\"></i><br/>正在載入...</div>'">
 
 <!-- ══════════════════════════════════════════
      VIEW 1: FULL PAGE RESTAURANT SELECTION
@@ -1236,9 +1236,10 @@ async function drawRoute() {
 }
 
 async function calculateRoute() {
-  if (routeStops.length < 2) return;
+  try {
+    if (routeStops.length < 2) return;
 
-  const coords = routeStops.map(s => `[${s.lng}, ${s.lat}]`).join(',');
+    const coords = routeStops.map(s => `[${s.lng}, ${s.lat}]`).join(',');
   // Try primary OSRM server first
   const osrmUrls = [
     `https://router.project-osrm.org/route/v1/foot/${coords}?overview=full&geometries=geojson`,
@@ -1302,7 +1303,7 @@ async function calculateRoute() {
   document.getElementById('stat-dist').textContent = distance;
   document.getElementById('stat-time').textContent = duration;
 
-    showToast(`✅ 路線已計算：${distance}km / 約${duration}分鐘`);
+  showToast(`✅ 路線已計算：${distance}km / 約${duration}分鐘`);
   } catch (e) {
     showToast('❌ 路線計算失敗');
     console.error(e);
