@@ -538,15 +538,24 @@
     @media (max-width: 768px) {
       #view-selection {
         flex-direction: column;
-        height: auto;
-        min-height: 100vh;
+        height: 100vh;
+        height: 100dvh;
       }
       #filter-panel {
         width: 100%;
-        height: auto;
-        min-height: 50vh;
+        height: 100%;
+        height: 100dvh;
         border-right: none;
         border-bottom: 1px solid var(--border);
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+      }
+      #restaurant-list {
+        flex: 1;
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+        min-height: 0;
       }
       /* Hide map and route sidebar in selection view on mobile */
       #view-selection > div[style*="flex:1"] {
