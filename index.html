@@ -8,7 +8,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>🍽️ 餐廳路線規劃</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/font-awesome@6.4.0/css/all.min.css" />
+  
   <style>
     :root {
       --primary: #2563eb;
@@ -596,7 +596,7 @@
     }
   </style>
 </head>
-<body onload="document.getElementById('restaurant-list').innerHTML='<div class=\"loading-row\"><i class=\"fa-solid fa-spinner fa-spin\"></i><br/>正在載入...</div>'">
+<body onload="document.getElementById('restaurant-list').innerHTML='<div class=\"loading-row\"><i class=\"🔄 fa-spin\"></i><br/>正在載入...</div>'">
 
 <!-- ══════════════════════════════════════════
      VIEW 1: FULL PAGE RESTAURANT SELECTION
@@ -651,7 +651,7 @@
     <!-- GPS Bar -->
     <div id="gps-bar">
       <button class="btn btn-secondary btn-sm" onclick="getCurrentLocation()" style="width:100%;justify-content:center;">
-        <i class="fa-solid fa-location-crosshairs"></i> 📍 定位我現在的位置
+        <i class="📍"></i> 📍 定位我現在的位置
       </button>
     </div>
 
@@ -664,17 +664,17 @@
     <!-- Action Buttons -->
     <div id="action-bar">
       <button class="btn btn-secondary btn-sm" onclick="selectAllVisible()" style="font-size:12px;">
-        <i class="fa-solid fa-check-square"></i> 全選
+        <i class="✓-square"></i> 全選
       </button>
       <button class="btn btn-secondary btn-sm" onclick="deselectAllVisible()" style="font-size:12px;">
-        <i class="fa-solid fa-square"></i> 取消全選
+        <i class="⬜"></i> 取消全選
       </button>
     </div>
 
     <!-- Restaurant List -->
     <div id="restaurant-list">
       <div class="loading-row">
-        <i class="fa-solid fa-spinner fa-spin"></i><br/>
+        <i class="🔄 fa-spin"></i><br/>
         載入餐廳數據中...
       </div>
     </div>
@@ -700,7 +700,7 @@
     <!-- Route Preview List -->
     <div id="selected-preview" style="flex:1;overflow-y:auto;padding:12px;">
       <div class="empty-state" id="preview-empty">
-        <i class="fa-solid fa-hand-pointer"></i>
+        <i class="👆"></i>
         左側選擇餐廳<br/>
         <small>已選擇的餐廳會顯示在這裡</small>
       </div>
@@ -712,7 +712,7 @@
         💡 選擇 2 間或以上餐廳即可計算最短路線
       </div>
       <button class="btn btn-primary btn-full" id="calc-route-btn" onclick="calculateAndShowRoute()" disabled>
-        <i class="fa-solid fa-route"></i> 計算最短路線
+        <i class="🗺️"></i> 計算最短路線
       </button>
     </div>
   </div>
@@ -725,7 +725,7 @@
   <!-- Top Bar -->
   <div id="map-top-bar">
     <button id="back-btn" onclick="switchToSelection()">
-      <i class="fa-solid fa-arrow-left"></i> 返回選擇
+      <i class="←"></i> 返回選擇
     </button>
     <h2>🗺️ 路線地圖</h2>
     <span id="map-selected-count">0 間餐廳</span>
@@ -743,10 +743,10 @@
       <div id="route-stop-list"></div>
       <div id="map-actions">
         <button class="btn btn-secondary" onclick="clearAllRoute()" style="flex:1;font-size:12px;">
-          <i class="fa-solid fa-trash"></i> 清除
+          <i class="🗑️"></i> 清除
         </button>
         <button class="btn btn-primary" onclick="reoptimizeRoute()" style="flex:1;font-size:12px;">
-          <i class="fa-solid fa-arrows-spin"></i> 重新排序
+          <i class="🔄"></i> 重新排序
         </button>
       </div>
     </div>
@@ -766,10 +766,10 @@
     </div>
     <div class="btn-row">
       <button class="btn btn-secondary" onclick="clearAllRoute()">
-        <i class="fa-solid fa-trash"></i> 清除
+        <i class="🗑️"></i> 清除
       </button>
       <button class="btn btn-primary" onclick="reoptimizeRoute()" style="flex:1;">
-        <i class="fa-solid fa-arrows-spin"></i> 重新計算
+        <i class="🔄"></i> 重新計算
       </button>
     </div>
   </div>
@@ -777,7 +777,7 @@
 
 <!-- Floating Route Button (shown in selection view) -->
 <button id="floating-route-btn" onclick="switchToMap()">
-  <i class="fa-solid fa-map-location-dot"></i>
+  <i class="🗺️-location-dot"></i>
   查看路線地圖 (<span id="floating-count">0</span>)
 </button>
 
@@ -807,7 +807,7 @@ async function init() {
   // Immediately show loading state in restaurant-list
   document.getElementById('restaurant-list').innerHTML = `
     <div class="loading-row">
-      <i class="fa-solid fa-spinner fa-spin"></i><br/>
+      <i class="🔄 fa-spin"></i><br/>
       正在連接伺服器...
     </div>`;
   
@@ -839,7 +839,7 @@ async function init() {
     // Show "select a district" message
     document.getElementById('restaurant-list').innerHTML = `
       <div class="empty-state">
-        <i class="fa-solid fa-hand-point-up"></i>
+        <i class="👆"></i>
         請先選擇地區<br/>
         <small>選擇地區後將自動載入該區餐廳</small>
       </div>`;
@@ -847,7 +847,7 @@ async function init() {
     if (e.name === 'AbortError') {
       document.getElementById('restaurant-list').innerHTML = `
         <div class="empty-state">
-          <i class="fa-solid fa-wifi"></i><br/>
+          <i class="📶"></i><br/>
           載入超時（15秒）<br/>
           <small>請檢查網絡連線<br/>或稍後再試</small>
         </div>`;
@@ -855,7 +855,7 @@ async function init() {
     } else {
       document.getElementById('restaurant-list').innerHTML = `
         <div class="empty-state">
-          <i class="fa-solid fa-circle-xmark"></i><br/>
+          <i class="❌"></i><br/>
           載入失敗：${e.message}<br/>
           <small>請檢查網絡或稍後再試</small>
         </div>`;
@@ -883,7 +883,7 @@ async function loadDistrictData(district) {
   isLoadingDistrict = true;
   
   const list = document.getElementById('restaurant-list');
-  list.innerHTML = `<div class="loading-row"><i class="fa-solid fa-spinner fa-spin"></i><br/>載入 ${district} 餐廳中...</div>`;
+  list.innerHTML = `<div class="loading-row"><i class="🔄 fa-spin"></i><br/>載入 ${district} 餐廳中...</div>`;
   
   try {
     const controller = new AbortController();
@@ -915,7 +915,7 @@ async function renderRestaurantList() {
   if (!district) {
     list.innerHTML = `
       <div class="empty-state">
-        <i class="fa-solid fa-hand-point-up"></i>
+        <i class="👆"></i>
         請先選擇地區<br/>
         <small>選擇地區後將自動載入該區餐廳</small>
       </div>`;
@@ -938,7 +938,7 @@ async function renderRestaurantList() {
   document.getElementById('visible-count').textContent = filtered.length;
 
   if (filtered.length === 0) {
-    list.innerHTML = `<div class="empty-state"><i class="fa-solid fa-utensils"></i>沒有餐廳</div>`;
+    list.innerHTML = `<div class="empty-state"><i class="🍽️"></i>沒有餐廳</div>`;
     return;
   }
 
@@ -1109,7 +1109,7 @@ function updateSelectionUI() {
         <div class="route-stop-addr">${escapeHtml(s.address || '')}</div>
       </div>
       <button class="route-stop-del" onclick="removeFromRoute('${s.poiId}')">
-        <i class="fa-solid fa-xmark"></i>
+        <i class="❌"></i>
       </button>
     </div>
   `).join('');
@@ -1137,7 +1137,7 @@ function getCurrentLocation() {
       if (document.getElementById('view-map').classList.contains('active') && map) {
         L.marker([lat, lng], {
           icon: L.divIcon({
-            html: '<div style="background:#22c55e;color:white;width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;border:3px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.3);"><i class="fa-solid fa-user"></i></div>',
+            html: '<div style="background:#22c55e;color:white;width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;border:3px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.3);"><i class="👤"></i></div>',
             className: '', iconSize: [28, 28], iconAnchor: [14, 14]
           })
         }).addTo(map).bindPopup('📍 我的位置').openPopup();
@@ -1194,7 +1194,7 @@ function renderRouteStops() {
         <div class="route-stop-addr">${escapeHtml(s.address || '')}</div>
       </div>
       <button class="route-stop-del" onclick="removeFromRoute('${s.poiId}')">
-        <i class="fa-solid fa-xmark"></i>
+        <i class="❌"></i>
       </button>
     </div>
   `).join('');
