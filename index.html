@@ -397,6 +397,17 @@
       border-bottom: 1px solid var(--border);
       font-size: 13px;
       font-weight: 700;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      cursor: pointer;
+      user-select: none;
+      background: #fafafa;
+    }
+    #route-sidebar-header:active { background: #eee; }
+    #route-sidebar-content {
+      flex: 1;
+      overflow-y: auto;
     }
     #route-stop-list {
       flex: 1;
@@ -561,6 +572,31 @@
       #view-selection > div[style*="flex:1"] {
         display: none !important;
       }
+      /* Mobile route sidebar: collapsible */
+      #route-sidebar {
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        max-height: 40vh;
+        z-index: 1000;
+        background: white;
+        border-top: 1px solid var(--border);
+        border-radius: 16px 16px 0 0;
+        box-shadow: 0 -4px 12px rgba(0,0,0,0.1);
+      }
+      #route-sidebar-content {
+        max-height: 30vh;
+        overflow-y: auto;
+      }
+      /* Map takes full screen on mobile */
+      #view-map #map {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+      }
     }
   </style>
 </head>
@@ -705,17 +741,20 @@
 
     <!-- Route Sidebar -->
     <div id="route-sidebar">
-      <div id="route-sidebar-header">
-        📍 路線順序
+      <div id="route-sidebar-header" onclick="toggleRouteSidebar()">
+        <span>📍 路線順序 <span id="sidebar-stop-count"></span></span>
+        <span id="sidebar-toggle-btn" style="font-size:12px;opacity:0.7;">▼</span>
       </div>
-      <div id="route-stop-list"></div>
-      <div id="map-actions">
-        <button class="btn btn-secondary" onclick="clearAllRoute()" style="flex:1;font-size:12px;">
-          <i class="fa-solid fa-trash"></i> 清除
-        </button>
-        <button class="btn btn-primary" onclick="reoptimizeRoute()" style="flex:1;font-size:12px;">
-          <i class="fa-solid fa-arrows-spin"></i> 重新排序
-        </button>
+      <div id="route-sidebar-content">
+        <div id="route-stop-list"></div>
+        <div id="map-actions">
+          <button class="btn btn-secondary" onclick="clearAllRoute()" style="flex:1;font-size:12px;">
+            <i class="fa-solid fa-trash"></i> 清除
+          </button>
+          <button class="btn btn-primary" onclick="reoptimizeRoute()" style="flex:1;font-size:12px;">
+            <i class="fa-solid fa-arrows-spin"></i> 重新排序
+          </button>
+        </div>
       </div>
     </div>
   </div>
@@ -1063,6 +1102,21 @@ function switchToMap() {
   initMap();
   renderRouteStops();
   drawRoute();
+}
+
+let routeSidebarExpanded = true;
+
+function toggleRouteSidebar() {
+  routeSidebarExpanded = !routeSidebarExpanded;
+  const content = document.getElementById('route-sidebar-content');
+  const toggleBtn = document.getElementById('sidebar-toggle-btn');
+  if (routeSidebarExpanded) {
+    content.style.display = 'flex';
+    toggleBtn.textContent = '▼';
+  } else {
+    content.style.display = 'none';
+    toggleBtn.textContent = '▲';
+  }
 }
 
 function switchToSelection() {
