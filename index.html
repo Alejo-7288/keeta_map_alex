@@ -931,13 +931,19 @@ function deselectAllVisible() {
 
 function updateSelectionUI() {
   const count = selectedRestaurants.size;
-  document.getElementById('selected-count-display').textContent = `已選擇 ${count} 間`;
-  document.getElementById('route-preview-count').textContent = count;
-  document.getElementById('floating-count').textContent = count;
-  document.getElementById('map-selected-count').textContent = `${count} 間餐廳`;
-
-  // Floating button
-  document.getElementById('floating-route-btn').classList.toggle('show', count > 0);
+  const selCount = document.getElementById('selected-count-display');
+  const routePrev = document.getElementById('route-preview-count');
+  const floatCount = document.getElementById('floating-count');
+  const mapCount = document.getElementById('map-selected-count');
+  const floatBtn = document.getElementById('floating-route-btn');
+  const calcBtn = document.getElementById('calc-route-btn');
+  
+  if (selCount) selCount.textContent = `已選擇 ${count} 間`;
+  if (routePrev) routePrev.textContent = count;
+  if (floatCount) floatCount.textContent = count;
+  if (mapCount) mapCount.textContent = `${count} 間餐廳`;
+  if (floatBtn) floatBtn.classList.toggle('show', count > 0);
+  if (calcBtn) calcBtn.disabled = count < 2;
 
   // Preview panel
   const preview = document.getElementById('selected-preview');
@@ -945,12 +951,11 @@ function updateSelectionUI() {
   const calcPanel = document.getElementById('route-calc-panel');
 
   if (count === 0) {
-    empty.style.display = 'block';
-    calcPanel.style.display = 'none';
+    if (empty) empty.style.display = 'block';
+    if (calcPanel) calcPanel.style.display = 'none';
   } else {
-    empty.style.display = 'none';
-    calcPanel.style.display = count >= 2 ? 'block' : 'none';
-    document.getElementById('calc-route-btn').disabled = count < 2;
+    if (empty) empty.style.display = 'none';
+    if (calcPanel) calcPanel.style.display = count >= 2 ? 'block' : 'none';
   }
 
   // Render preview list
@@ -1091,7 +1096,8 @@ async function drawRoute() {
 async function calculateRoute() {
   if (routeStops.length < 2) return;
 
-  const coords = routeStops.map(s => `[${s.lng}, ${s.lat}]`).join(',');
+  // Format: lng,lat;lng,lat (semicolon separated, no brackets)
+  const coords = routeStops.map(s => `${s.lng},${s.lat}`).join(';');
   const url = `https://router.project-osrm.org/route/v1/foot/${coords}?overview=full&geometries=geojson`;
 
   try {
