@@ -1107,9 +1107,29 @@ function switchToSelection() {
 function initMap() {
   if (map) { map.invalidateSize(); return; }
   map = L.map('map').setView([22.3193, 114.1694], 12);
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    attribution: '© OpenStreetMap'
-  }).addTo(map);
+  
+  // Primary: OpenStreetMap
+  const osmTiles = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '© OpenStreetMap',
+    maxZoom: 19
+  });
+  
+  // Fallback: ESRI World Street Map (no API key needed)
+  const esriTiles = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', {
+    attribution: '© Esri',
+    maxZoom: 19
+  });
+  
+  osmTiles.on('tileerror', function() {
+    if (!window.tileFallback) {
+      window.tileFallback = true;
+      map.removeLayer(osmTiles);
+      esriTiles.addTo(map);
+      console.log('Switched to ESRI tiles');
+    }
+  });
+  
+  osmTiles.addTo(map);
 }
 
 function renderRouteStops() {
@@ -1197,13 +1217,12 @@ async function calculateRoute() {
         routeStops[i].lat - routeStops[i-1].lat,
         routeStops[i].lng - routeStops[i-1].lng
       );
-      totalDist += d * 111; // rough km conversion
+      totalDist += d * 111;
     }
     const distKm = totalDist.toFixed(2);
-    const walkTime = Math.round(totalDist / 5 * 60); // 5km/h walking
+    const walkTime = Math.round(totalDist / 5 * 60);
 
     if (routeLayer) map.removeLayer(routeLayer);
-    // Draw straight lines as fallback
     const latlngs = routeStops.map(s => [s.lat, s.lng]);
     routeLayer = L.polyline(latlngs, {
       color: '#2563eb', weight: 3, opacity: 0.7, dashArray: '8, 8'
@@ -1219,22 +1238,15 @@ async function calculateRoute() {
   const distance = (route.distance / 1000).toFixed(2);
   const duration = Math.round(route.duration / 60);
 
-  // Draw polyline
   if (routeLayer) map.removeLayer(routeLayer);
   routeLayer = L.geoJSON(route.geometry, {
     style: { color: '#2563eb', weight: 4, opacity: 0.8 }
   }).addTo(map);
 
-  // Update stats
   document.getElementById('route-info-panel').classList.add('show');
   document.getElementById('stat-dist').textContent = distance;
   document.getElementById('stat-time').textContent = duration;
-
-    showToast(`✅ 路線已計算：${distance}km / 約${duration}分鐘`);
-  } catch (e) {
-    showToast('❌ 路線計算失敗');
-    console.error(e);
-  }
+  showToast(`✅ 路線已計算：${distance}km / 約${duration}分鐘`);
 }
 
 async function calculateAndShowRoute() {
