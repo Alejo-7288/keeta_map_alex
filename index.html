@@ -1319,14 +1319,13 @@ async function calculateRoute() {
 }
 
 async function calculateAndShowRoute() {
-  switchToMap();
-  // Wait for map to fully initialize
-  await new Promise(r => setTimeout(r, 500));
-  if (!map) {
-    showToast('❌ 地圖初始化失敗，請稍後再試');
+  if (selectedRestaurants.size < 2) {
+    showToast('⚠️ 請先選擇2間或以上餐廳');
     return;
   }
-  await calculateRoute();
+  switchToMap();
+  // calculateRoute will draw immediately (straight line first)
+  setTimeout(() => calculateRoute(), 100);
 }
 
 function reoptimizeRoute() {
