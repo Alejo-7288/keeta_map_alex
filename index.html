@@ -804,6 +804,13 @@ let filterEarly = false;
 // INIT
 // ══════════════════════════════════════════
 async function init() {
+  // Immediately show loading state in restaurant-list
+  document.getElementById('restaurant-list').innerHTML = `
+    <div class="loading-row">
+      <i class="fa-solid fa-spinner fa-spin"></i><br/>
+      正在連接伺服器...
+    </div>`;
+  
   showToast('🚀 載入地區列表...');
   try {
     const controller = new AbortController();
@@ -838,8 +845,20 @@ async function init() {
       </div>`;
   } catch (e) {
     if (e.name === 'AbortError') {
+      document.getElementById('restaurant-list').innerHTML = `
+        <div class="empty-state">
+          <i class="fa-solid fa-wifi"></i><br/>
+          載入超時（15秒）<br/>
+          <small>請檢查網絡連線<br/>或稍後再試</small>
+        </div>`;
       showToast('❌ 載入超時，請檢查網絡連線');
     } else {
+      document.getElementById('restaurant-list').innerHTML = `
+        <div class="empty-state">
+          <i class="fa-solid fa-circle-xmark"></i><br/>
+          載入失敗：${e.message}<br/>
+          <small>請檢查網絡或稍後再試</small>
+        </div>`;
       showToast('❌ 無法載入數據庫：' + e.message);
     }
     console.error('Init error:', e);
