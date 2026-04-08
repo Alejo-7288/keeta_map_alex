@@ -375,6 +375,12 @@
       <select id="district-select" onchange="filterRestaurants()">
         <option value="">全部地區</option>
       </select>
+      <select id="status-filter" onchange="filterRestaurants()" style="font-size:13px;padding:5px 8px;border-radius:6px;border:1px solid #ddd;">
+        <option value="">全部狀態</option>
+        <option value="未處理">⭕ 未處理</option>
+        <option value="已認領">✅ 已認領</option>
+        <option value="已進駐">🏠 已進駐</option>
+      </select>
       <div style="display:flex;gap:8px;align-items:center;">
         <label style="font-size:12px;cursor:pointer;display:flex;align-items:center;gap:5px;white-space:nowrap;">
           <input type="checkbox" id="late-night-filter" onchange="filterRestaurants()" />
@@ -798,11 +804,15 @@ function renderRestaurantList() {
   const district = document.getElementById('district-select').value;
   const isLateNight = document.getElementById('late-night-filter').checked;
   const isEarly = document.getElementById('early-filter').checked;
+  const statusFilter = document.getElementById('status-filter').value;
 
   let filtered = allRestaurants;
   if (district) filtered = filtered.filter(r => r.district === district);
   if (isLateNight) filtered = filtered.filter(r => r.is_late_night);
   if (isEarly) filtered = filtered.filter(r => r.is_early);
+  if (statusFilter === '已認領') filtered = filtered.filter(r => r.status === '已認領');
+  if (statusFilter === '已進駐') filtered = filtered.filter(r => r.status === '已進駐');
+  if (statusFilter === '未處理') filtered = filtered.filter(r => !r.status || r.status === '');
 
   if (filtered.length === 0) {
     list.innerHTML = `<div class="empty-state"><i class="fa-solid fa-utensils"></i>沒有餐廳</div>`;
@@ -819,6 +829,8 @@ function renderRestaurantList() {
     const tags = [];
     if (r.is_late_night) tags.push('<span style="background:#1e293b;color:#fbbf24;font-size:10px;padding:2px 6px;border-radius:10px;margin-right:4px;">🌙 宵夜</span>');
     if (r.is_early) tags.push('<span style="background:#fef3c7;color:#92400e;font-size:10px;padding:2px 6px;border-radius:10px;margin-right:4px;">🌅 早市</span>');
+    if (r.status === '已認領') tags.push('<span style="background:#d1fae5;color:#065f46;font-size:10px;padding:2px 6px;border-radius:10px;margin-right:4px;">✅ 已認領</span>');
+    if (r.status === '已進駐') tags.push('<span style="background:#dbeafe;color:#1e40af;font-size:10px;padding:2px 6px;border-radius:10px;margin-right:4px;">🏠 已進駐</span>');
 
     return `
     <div class="rest-item ${geoClass}" id="rest-${r.poiId}">
@@ -849,11 +861,15 @@ function updateDbStats() {
   const district = document.getElementById('district-select').value;
   const isLateNight = document.getElementById('late-night-filter').checked;
   const isEarly = document.getElementById('early-filter').checked;
+  const statusFilter = document.getElementById('status-filter').value;
 
   let filtered = allRestaurants;
   if (district) filtered = filtered.filter(r => r.district === district);
   if (isLateNight) filtered = filtered.filter(r => r.is_late_night);
   if (isEarly) filtered = filtered.filter(r => r.is_early);
+  if (statusFilter === '已認領') filtered = filtered.filter(r => r.status === '已認領');
+  if (statusFilter === '已進駐') filtered = filtered.filter(r => r.status === '已進駐');
+  if (statusFilter === '未處理') filtered = filtered.filter(r => !r.status || r.status === '');
 
   const geocoded = filtered.filter(r => r.geocoded).length;
   document.getElementById('total-count').textContent = filtered.length;

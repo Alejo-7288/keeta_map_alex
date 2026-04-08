@@ -86,6 +86,7 @@ def load_restaurants():
             "has_weekend": bool(g("has_weekend")),
             "is_late_night": bool(g("is_late_night")),
             "is_early": bool(g("is_early")),
+            "status": str(g("STATUS") or "").strip(),
         })
 
     _restaurants_cache = restaurants
@@ -130,9 +131,10 @@ def index():
 
 @app.route("/api/restaurants")
 def get_restaurants():
-    """獲取餐廳列表，可按地區/宵夜店篩選"""
+    """獲取餐廳列表，可按地區/宵夜店/狀態篩選"""
     district = request.args.get("district", "").strip()
     late_night = request.args.get("late_night", "").strip()  # "1" = 宵夜店 only
+    status = request.args.get("status", "").strip()  # "已認領" / "已進駐" / "未處理"
 
     restaurants = load_restaurants()
     cache = load_cache()
@@ -152,6 +154,12 @@ def get_restaurants():
         if district and r["district"] != district:
             continue
         if late_night == "1" and not r["is_late_night"]:
+            continue
+        if status == "已認領" and r["status"] != "已認領":
+            continue
+        if status == "已進駐" and r["status"] != "已進駐":
+            continue
+        if status == "未處理" and r["status"] != "":
             continue
         result.append(r)
 
