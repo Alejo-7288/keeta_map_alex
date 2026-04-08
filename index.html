@@ -1239,7 +1239,7 @@ async function calculateRoute() {
   try {
     if (routeStops.length < 2) return;
 
-    // IMMEDIATELY show straight-line as optimistic UI
+    // FIRST: Draw straight-line immediately (no external dependencies!)
     let totalDist = 0;
     for (let i = 1; i < routeStops.length; i++) {
       const d = Math.hypot(
@@ -1251,56 +1251,67 @@ async function calculateRoute() {
     const distKm = totalDist.toFixed(2);
     const walkTime = Math.round(totalDist / 5 * 60);
 
-    // Draw straight line immediately
     if (routeLayer) map.removeLayer(routeLayer);
     const latlngs = routeStops.map(s => [s.lat, s.lng]);
     routeLayer = L.polyline(latlngs, {
-      color: '#9333ea', weight: 3, opacity: 0.7, dashArray: '10, 10'
+      color: '#9333ea', weight: 4, opacity: 0.8, dashArray: '12, 8'
     }).addTo(map);
     document.getElementById('route-info-panel').classList.add('show');
-    document.getElementById('stat-dist').textContent = distKm + ' km';
-    document.getElementById('stat-time').textContent = walkTime + ' min';
-    showToast('🚶 計算路線中...');
+    document.getElementById('stat-dist').textContent = distKm + ' km (直線)';
+    document.getElementById('stat-time').textContent = walkTime + ' min (估算)';
+    showToast('📍 直線距離已顯示');
 
-    // NOW try OSRM in background with shorter timeout
+    // SECOND: Try OSRM in background (7 second timeout)
     const coords = routeStops.map(s => `${s.lng},${s.lat}`).join(';');
-    const osrmUrls = [
-      `https://router.project-osrm.org/route/v1/foot/${coords}?overview=full&geometries=geojson`,
-      `https://routing.openstreetmap.de/routed-foot/route/v1/foot/${coords}?overview=full&geometries=geojson`
-    ];
-
-    let route = null;
-    for (const url of osrmUrls) {
-      try {
-        const resp = await fetch(url, { signal: AbortSignal.timeout(5000) });
-        if (!resp.ok) continue;
+    try {
+      const resp = await fetch(
+        `https://router.project-osrm.org/route/v1/foot/${coords}?overview=full&geometries=geojson`,
+        { signal: AbortSignal.timeout(7000) }
+      );
+      if (resp.ok) {
         const data = await resp.json();
         if (data.routes && data.routes[0]) {
-          route = data.routes[0];
-          break;
+          const r = data.routes[0];
+          const realDist = (r.distance / 1000).toFixed(2);
+          const realTime = Math.round(r.duration / 60);
+          if (routeLayer) map.removeLayer(routeLayer);
+          routeLayer = L.geoJSON(r.geometry, {
+            style: { color: '#2563eb', weight: 4, opacity: 0.8 }
+          }).addTo(map);
+          document.getElementById('stat-dist').textContent = realDist + ' km';
+          document.getElementById('stat-time').textContent = realTime + ' min';
+          showToast('✅ 路線已計算：' + realDist + 'km / 約' + realTime + '分鐘');
+          return;
         }
-      } catch (e) { continue; }
-    }
+      }
+    } catch (e) { /* OSRM failed, keep straight line */ }
 
-    if (route) {
-      // Got real route - update the polyline!
-      const distance = (route.distance / 1000).toFixed(2);
-      const duration = Math.round(route.duration / 60);
+    // THIRD: OSRM also failed - try alternate server
+    try {
+      const resp2 = await fetch(
+        `https://routing.openstreetmap.de/routed-foot/route/v1/foot/${coords}?overview=full&geometries=geojson`,
+        { signal: AbortSignal.timeout(7000) }
+      );
+      if (resp2.ok) {
+        const data2 = await resp2.json();
+        if (data2.routes && data2.routes[0]) {
+          const r = data2.routes[0];
+          const realDist = (r.distance / 1000).toFixed(2);
+          const realTime = Math.round(r.duration / 60);
+          if (routeLayer) map.removeLayer(routeLayer);
+          routeLayer = L.geoJSON(r.geometry, {
+            style: { color: '#2563eb', weight: 4, opacity: 0.8 }
+          }).addTo(map);
+          document.getElementById('stat-dist').textContent = realDist + ' km';
+          document.getElementById('stat-time').textContent = realTime + ' min';
+          showToast('✅ 路線已計算：' + realDist + 'km / 約' + realTime + '分鐘');
+          return;
+        }
+      }
+    } catch (e) { /* alternate also failed, keep straight line */ }
 
-      if (routeLayer) map.removeLayer(routeLayer);
-      routeLayer = L.geoJSON(route.geometry, {
-        style: { color: '#2563eb', weight: 4, opacity: 0.8 }
-      }).addTo(map);
-
-      document.getElementById('stat-dist').textContent = distance + ' km';
-      document.getElementById('stat-time').textContent = duration + ' min';
-      showToast('✅ 路線已計算：' + distance + 'km / 約' + duration + '分鐘');
-    } else {
-      // Still no route - stick with straight line
-      document.getElementById('stat-dist').textContent = distKm + ' km (直線)';
-      document.getElementById('stat-time').textContent = walkTime + ' min (估算)';
-      showToast('📍 已顯示直線距離，實際路線可能不同');
-    }
+    // All services failed - stay with straight line (already drawn above)
+    showToast('📍 顯示直線距離（網絡路線服務不可用）');
   } catch (e) {
     showToast('❌ 路線計算失敗');
     console.error(e);
