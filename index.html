@@ -1108,28 +1108,11 @@ function initMap() {
   if (map) { map.invalidateSize(); return; }
   map = L.map('map').setView([22.3193, 114.1694], 12);
   
-  // Primary: OpenStreetMap
-  const osmTiles = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    attribution: '© OpenStreetMap',
-    maxZoom: 19
-  });
-  
-  // Fallback: ESRI World Street Map (no API key needed)
-  const esriTiles = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', {
+  // Use ESRI tiles directly (more reliable)
+  L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', {
     attribution: '© Esri',
     maxZoom: 19
-  });
-  
-  osmTiles.on('tileerror', function() {
-    if (!window.tileFallback) {
-      window.tileFallback = true;
-      map.removeLayer(osmTiles);
-      esriTiles.addTo(map);
-      console.log('Switched to ESRI tiles');
-    }
-  });
-  
-  osmTiles.addTo(map);
+  }).addTo(map);
 }
 
 function renderRouteStops() {
