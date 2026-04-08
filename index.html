@@ -801,18 +801,42 @@ let filterEarly = false;
 // INIT
 // ══════════════════════════════════════════
 async function init() {
-  showToast('🚀 載入餐廳數據中...');
+  showToast('🚀 載入餐廳數據中...（請稍候）');
   try {
-    const resp = await fetch(`${API_BASE}/api/restaurants`);
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 30000);
+    
+    const resp = await fetch(`${API_BASE}/api/restaurants`, {
+      signal: controller.signal
+    });
+    clearTimeout(timeout);
+    
     if (!resp.ok) throw new Error('API error: ' + resp.status);
-    allRestaurants = await resp.json();
+    
+    const text = await resp.text();
+    allRestaurants = JSON.parse(text);
+    
+    if (!Array.isArray(allRestaurants) || allRestaurants.length === 0) {
+      throw new Error('數據格式錯誤或為空');
+    }
+    
     document.getElementById('total-db-count').textContent = allRestaurants.length;
     loadDistrictOptions();
     renderRestaurantList();
     showToast(`✅ ${allRestaurants.length} 間餐廳已載入`);
   } catch (e) {
-    showToast('❌ 無法載入數據庫，請確保 Flask 在 port 19801 運行');
-    console.error(e);
+    if (e.name === 'AbortError') {
+      showToast('❌ 載入超時，請檢查網絡連線');
+    } else {
+      showToast('❌ 無法載入數據庫：' + e.message);
+    }
+    console.error('Init error:', e);
+    document.getElementById('restaurant-list').innerHTML = `
+      <div class="empty-state">
+        <i class="fa-solid fa-circle-exclamation"></i>
+        載入失敗：${e.message}<br/>
+        <small>請檢查網絡或重新整理頁面</small>
+      </div>`;
   }
 }
 
