@@ -39,10 +39,11 @@ CORS(app)  # Enable cross-origin requests for the frontend
 
 # ============ DATA LOADING ============
 _restaurants_cache = None
+_district_index = {}  # {district: [restaurant_indices]}
 
 def load_restaurants():
-    """載入 JSON 餐廳數據（記憶體緩存）"""
-    global _restaurants_cache
+    """載入 JSON 餐廳數據（記憶體緩存）+ 建立地區索引"""
+    global _restaurants_cache, _district_index
     if _restaurants_cache is not None:
         return _restaurants_cache
 
@@ -50,7 +51,15 @@ def load_restaurants():
         try:
             with open(JSON_PATH, encoding='utf-8') as f:
                 _restaurants_cache = json.load(f)
-            print(f"✅ Loaded {len(_restaurants_cache)} restaurants from JSON")
+            # Build district index
+            _district_index = {}
+            for i, r in enumerate(_restaurants_cache):
+                d = r.get('district')
+                if d:
+                    if d not in _district_index:
+                        _district_index[d] = []
+                    _district_index[d].append(i)
+            print(f"✅ Loaded {len(_restaurants_cache)} restaurants from JSON, {_district_index.__len__()} districts")
             return _restaurants_cache
         except Exception as e:
             print(f"❌ JSON load error: {e}")
@@ -136,22 +145,31 @@ def index():
 
 @app.route("/api/restaurants")
 def get_restaurants():
-    """獲取餐廳列表，可按地區/宵夜店/狀態篩選"""
+    """獲取餐廳列表，可按地區/宵夜店/狀態篩選（已優化使用地區索引）"""
     district = request.args.get("district", "").strip()
     late_night = request.args.get("late_night", "").strip()  # "1" = 宵夜店 only
     status = request.args.get("status", "").strip()  # "已認領" / "已進駐" / "未處理"
 
     restaurants = load_restaurants()
     cache = load_cache()
+    
+    # Use district index for fast lookup when district specified
+    if district and district in _district_index:
+        indices = _district_index[district]
+    else:
+        indices = range(len(restaurants))
 
     result = []
-    for r in restaurants:
+    for i in indices:
+        r = restaurants[i]
         poi = r["poiId"]
         if poi in cache:
+            r = dict(r)  # Copy to avoid modifying cache
             r["lat"] = cache[poi]["lat"]
             r["lng"] = cache[poi]["lng"]
             r["geocoded"] = True
         else:
+            r = dict(r)
             r["lat"] = None
             r["lng"] = None
             r["geocoded"] = False

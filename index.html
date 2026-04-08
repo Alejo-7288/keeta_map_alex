@@ -801,29 +801,38 @@ let filterEarly = false;
 // INIT
 // ══════════════════════════════════════════
 async function init() {
-  showToast('🚀 載入餐廳數據中...（請稍候）');
+  showToast('🚀 載入地區列表...');
   try {
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 30000);
+    const timeout = setTimeout(() => controller.abort(), 15000);
     
-    const resp = await fetch(`${API_BASE}/api/restaurants`, {
+    const resp = await fetch(`${API_BASE}/api/districts`, {
       signal: controller.signal
     });
     clearTimeout(timeout);
     
     if (!resp.ok) throw new Error('API error: ' + resp.status);
     
-    const text = await resp.text();
-    allRestaurants = JSON.parse(text);
-    
-    if (!Array.isArray(allRestaurants) || allRestaurants.length === 0) {
-      throw new Error('數據格式錯誤或為空');
+    const districts = await resp.json();
+    if (!Array.isArray(districts) || districts.length === 0) {
+      throw new Error('地區數據格式錯誤');
     }
     
-    document.getElementById('total-db-count').textContent = allRestaurants.length;
-    loadDistrictOptions();
-    renderRestaurantList();
-    showToast(`✅ ${allRestaurants.length} 間餐廳已載入`);
+    // Populate district select
+    const sel = document.getElementById('district-select');
+    sel.innerHTML = '<option value="">全部地區</option>' +
+      districts.map(d => `<option value="${d}">${d}</option>`).join('');
+    
+    document.getElementById('total-db-count').textContent = districts.length + ' 個地區';
+    showToast(`✅ ${districts.length} 個地區已載入，請選擇地區`);
+    
+    // Show "select a district" message
+    document.getElementById('restaurant-list').innerHTML = `
+      <div class="empty-state">
+        <i class="fa-solid fa-hand-point-up"></i>
+        請先選擇地區<br/>
+        <small>選擇地區後將自動載入該區餐廳</small>
+      </div>`;
   } catch (e) {
     if (e.name === 'AbortError') {
       showToast('❌ 載入超時，請檢查網絡連線');
@@ -831,34 +840,71 @@ async function init() {
       showToast('❌ 無法載入數據庫：' + e.message);
     }
     console.error('Init error:', e);
-    document.getElementById('restaurant-list').innerHTML = `
-      <div class="empty-state">
-        <i class="fa-solid fa-circle-exclamation"></i>
-        載入失敗：${e.message}<br/>
-        <small>請檢查網絡或重新整理頁面</small>
-      </div>`;
   }
-}
-
-function loadDistrictOptions() {
-  const districts = [...new Set(allRestaurants.map(r => r.district).filter(Boolean))].sort();
-  const sel = document.getElementById('district-select');
-  sel.innerHTML = '<option value="">全部地區</option>' +
-    districts.map(d => `<option value="${d}">${d}</option>`).join('');
 }
 
 // ══════════════════════════════════════════
 // RENDER RESTAURANT LIST
 // ══════════════════════════════════════════
-function renderRestaurantList() {
+
+// Lazy-load cache: {district: [restaurants]}
+const districtCache = {};
+let currentDistrictData = [];  // Current loaded restaurants
+let isLoadingDistrict = false;
+
+async function loadDistrictData(district) {
+  if (districtCache[district]) {
+    return districtCache[district];
+  }
+  
+  if (isLoadingDistrict) return [];
+  isLoadingDistrict = true;
+  
+  const list = document.getElementById('restaurant-list');
+  list.innerHTML = `<div class="loading-row"><i class="fa-solid fa-spinner fa-spin"></i><br/>載入 ${district} 餐廳中...</div>`;
+  
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 20000);
+    const resp = await fetch(`${API_BASE}/api/restaurants?district=${encodeURIComponent(district)}`, {
+      signal: controller.signal
+    });
+    clearTimeout(timeout);
+    
+    if (!resp.ok) throw new Error('API error');
+    const data = await resp.json();
+    districtCache[district] = data;
+    return data;
+  } catch (e) {
+    console.error('Load district error:', e);
+    return [];
+  } finally {
+    isLoadingDistrict = false;
+  }
+}
+
+async function renderRestaurantList() {
   const list = document.getElementById('restaurant-list');
   const district = document.getElementById('district-select').value;
   const statusFilter = document.getElementById('status-filter').value;
   const search = document.getElementById('search-input').value.trim().toLowerCase();
 
-  let filtered = allRestaurants;
+  // No district selected - show instruction
+  if (!district) {
+    list.innerHTML = `
+      <div class="empty-state">
+        <i class="fa-solid fa-hand-point-up"></i>
+        請先選擇地區<br/>
+        <small>選擇地區後將自動載入該區餐廳</small>
+      </div>`;
+    document.getElementById('visible-count').textContent = '0';
+    return;
+  }
 
-  if (district) filtered = filtered.filter(r => r.district === district);
+  // Load district data if not cached
+  let filtered = await loadDistrictData(district);
+
+  // Apply additional filters
   if (filterLate) filtered = filtered.filter(r => r.is_late_night);
   if (filterEarly) filtered = filtered.filter(r => r.is_early);
   if (statusFilter) {
@@ -881,7 +927,6 @@ function renderRestaurantList() {
     const tags = [];
     if (r.is_late_night) tags.push('<span class="rest-tag tag-late">🌙 宵夜</span>');
     if (r.is_early) tags.push('<span class="rest-tag tag-early">🌅 早市</span>');
-    // Support both simplified and traditional Chinese
     const status = r.status || '';
     if (status === '已認領' || status === '己認領') tags.push('<span class="rest-tag tag-claimed">✅ 已認領</span>');
     if (status === '已進駐' || status === '己進駐') tags.push('<span class="rest-tag tag-进驻">🏠 已進駐</span>');
@@ -894,7 +939,7 @@ function renderRestaurantList() {
           ${isSelected ? 'checked' : ''}
           onclick="event.stopPropagation(); toggleRest('${r.poiId}')" />
         <div class="rest-name">${escapeHtml(r.name)}</div>
-        <div class="rest-district-badge">${r.district}</div>
+        <div class="rest-district-badge">${r.district || district}</div>
       </div>
       ${tags.length > 0 ? `<div class="rest-tags">${tags.join('')}</div>` : ''}
       <div class="rest-address">${escapeHtml(r.address || '')}</div>
@@ -924,7 +969,12 @@ function toggleFilter(type) {
 }
 
 function toggleRest(poiId) {
-  const r = allRestaurants.find(x => x.poiId === poiId);
+  // Search through all cached district data
+  let r = null;
+  for (const district in districtCache) {
+    r = districtCache[district].find(x => x.poiId === poiId);
+    if (r) break;
+  }
   if (!r) return;
 
   if (selectedRestaurants.has(poiId)) {
@@ -955,13 +1005,14 @@ function toggleRest(poiId) {
   updateSelectionUI();
 }
 
-function selectAllVisible() {
+async function selectAllVisible() {
   const district = document.getElementById('district-select').value;
+  if (!district) { showToast('⚠️ 請先選擇地區'); return; }
+  
   const statusFilter = document.getElementById('status-filter').value;
   const search = document.getElementById('search-input').value.trim().toLowerCase();
 
-  let filtered = allRestaurants;
-  if (district) filtered = filtered.filter(r => r.district === district);
+  let filtered = districtCache[district] || await loadDistrictData(district);
   if (filterLate) filtered = filtered.filter(r => r.is_late_night);
   if (filterEarly) filtered = filtered.filter(r => r.is_early);
   if (statusFilter === '未處理') filtered = filtered.filter(r => !r.status || r.status === 'None' || r.status === '');
@@ -985,8 +1036,7 @@ function deselectAllVisible() {
   const statusFilter = document.getElementById('status-filter').value;
   const search = document.getElementById('search-input').value.trim().toLowerCase();
 
-  let filtered = allRestaurants;
-  if (district) filtered = filtered.filter(r => r.district === district);
+  let filtered = districtCache[district] || [];
   if (filterLate) filtered = filtered.filter(r => r.is_late_night);
   if (filterEarly) filtered = filtered.filter(r => r.is_early);
   if (statusFilter === '未處理') filtered = filtered.filter(r => !r.status || r.status === 'None' || r.status === '');
@@ -1281,7 +1331,11 @@ function clearAllRoute() {
 // GEOCODING (single)
 // ══════════════════════════════════════════
 async function geocodeOne(poiId) {
-  const r = allRestaurants.find(x => x.poiId === poiId);
+  let r = null;
+  for (const district in districtCache) {
+    r = districtCache[district].find(x => x.poiId === poiId);
+    if (r) break;
+  }
   if (!r || !r.address) return;
 
   try {
