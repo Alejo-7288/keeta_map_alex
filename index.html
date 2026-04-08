@@ -1180,7 +1180,7 @@ function switchToSelection() {
 function initMap() {
   if (map) { map.invalidateSize(); return; }
   map = L.map('map', { zoomControl: true, attributionControl: true }).setView([22.3193, 114.1694], 12);
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  L.tileLayer('https://tile.openstreetmap.fr/hot/{z}/{x}/{y}.png', {
     attribution: '© OpenStreetMap'
   }).addTo(map);
   // Ensure tiles render after container is visible
