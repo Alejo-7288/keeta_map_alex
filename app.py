@@ -21,11 +21,11 @@ from flask_cors import CORS
 ssl._create_default_https_context = ssl._create_unverified_context
 
 # ============ CONFIG ============
-API_KEY = "AIzaSyCn1rnmEEeZrBhw_lfOP3cXdv4l82fVkDg"
+API_KEY = os.environ.get("API_KEY", "")
+JSON_PATH = Path(__file__).parent / "restaurants.json"
 EXCEL_PATH = Path(__file__).parent / "openrice_restaurants.xlsx"
 CACHE_PATH = Path(__file__).parent / "geocode_cache.json"
-PROGRESS_PATH = Path(__file__).parent / "geocode_progress.json"
-PORT = 19801
+PORT = int(os.environ.get("PORT", 19801))
 # ===============================
 
 # ============ BACKGROUND GEOCODING ============
@@ -41,57 +41,62 @@ CORS(app)  # Enable cross-origin requests for the frontend
 _restaurants_cache = None
 
 def load_restaurants():
-    """載入 Excel 並回傳餐廳列表（記憶體緩存）"""
+    """載入 JSON 餐廳數據（記憶體緩存）"""
     global _restaurants_cache
     if _restaurants_cache is not None:
         return _restaurants_cache
 
-    try:
-        import openpyxl
-    except ImportError:
-        import subprocess
-        subprocess.check_call(["pip", "install", "openpyxl", "-q"])
-        import openpyxl
-
-    if not EXCEL_PATH.exists():
-        _restaurants_cache = []
-        return _restaurants_cache
-
-    wb = openpyxl.load_workbook(EXCEL_PATH, data_only=True)
-    ws = wb.active
-
-    restaurants = []
-    headers = None
-    for i, row in enumerate(ws.iter_rows(values_only=True)):
-        if i == 0:
-            headers = {str(cell): idx for idx, cell in enumerate(row)}
-            continue
-        if not row or not row[0]:
-            continue
-        def g(key, default=None):
-            idx = headers.get(key, default)
-            return row[idx] if idx is not None and idx < len(row) else None
-        
-        restaurants.append({
-            "poiId": str(g("poiId") or "").strip(),
-            "name": str(g("店名") or "").strip(),
-            "district": str(g("地區") or "").strip(),
-            "address": str(g("地址") or "").strip(),
-            "phone": str(g("電話") or "").strip(),
-            "hours": str(g("營業時間") or "").strip(),
-            "url": str(g("url") or "").strip(),
-            "opening_year": str(g("opening_year") or "").strip(),
-            "age": str(g("age") or "").strip(),
-            "age_bucket": str(g("age_bucket") or "").strip(),
-            "has_weekend": bool(g("has_weekend")),
-            "is_late_night": bool(g("is_late_night")),
-            "is_early": bool(g("is_early")),
-            "status": str(g("STATUS") or "").strip(),
-        })
-
-    _restaurants_cache = restaurants
-    print(f"✅ Loaded {len(restaurants)} restaurants from Excel")
-    return restaurants
+    if JSON_PATH.exists():
+        try:
+            with open(JSON_PATH, encoding='utf-8') as f:
+                _restaurants_cache = json.load(f)
+            print(f"✅ Loaded {len(_restaurants_cache)} restaurants from JSON")
+            return _restaurants_cache
+        except Exception as e:
+            print(f"❌ JSON load error: {e}")
+    
+    # Fallback to Excel
+    if EXCEL_PATH.exists():
+        try:
+            import openpyxl
+            wb = openpyxl.load_workbook(EXCEL_PATH, data_only=True)
+            ws = wb.active
+            restaurants = []
+            headers = None
+            for i, row in enumerate(ws.iter_rows(values_only=True)):
+                if i == 0:
+                    headers = {str(cell): idx for idx, cell in enumerate(row)}
+                    continue
+                if not row or not row[0]:
+                    continue
+                def g(key, default=None):
+                    idx = headers.get(key, default)
+                    return row[idx] if idx is not None and idx < len(row) else None
+                restaurants.append({
+                    "poiId": str(g("poiId") or "").strip(),
+                    "name": str(g("店名") or "").strip(),
+                    "district": str(g("地區") or "").strip(),
+                    "address": str(g("地址") or "").strip(),
+                    "phone": str(g("電話") or "").strip(),
+                    "hours": str(g("營業時間") or "").strip(),
+                    "url": str(g("url") or "").strip(),
+                    "opening_year": str(g("opening_year") or "").strip(),
+                    "age": str(g("age") or "").strip(),
+                    "age_bucket": str(g("age_bucket") or "").strip(),
+                    "has_weekend": bool(g("has_weekend")),
+                    "is_late_night": bool(g("is_late_night")),
+                    "is_early": bool(g("is_early")),
+                    "status": str(g("STATUS") or "").strip(),
+                })
+            _restaurants_cache = restaurants
+            print(f"✅ Loaded {len(restaurants)} restaurants from Excel (fallback)")
+            return _restaurants_cache
+        except Exception as e:
+            print(f"❌ Excel load error: {e}")
+    
+    _restaurants_cache = []
+    print(f"❌ No restaurant data found!")
+    return _restaurants_cache
 
 
 def load_cache():
@@ -159,11 +164,30 @@ def get_restaurants():
             continue
         if status == "已進駐" and r["status"] != "已進駐":
             continue
-        if status == "未處理" and r["status"] != "":
+        if status == "未處理" and (not r["status"] or r["status"] == "None"):
             continue
         result.append(r)
 
     return jsonify(result)
+
+
+@app.route("/api/debug")
+def debug():
+    """Debug endpoint - returns status of data loading"""
+    import os
+    data_dir = Path(__file__).parent
+    return jsonify({
+        "json_exists": JSON_PATH.exists(),
+        "excel_exists": EXCEL_PATH.exists(),
+        "json_size": JSON_PATH.stat().st_size if JSON_PATH.exists() else 0,
+        "excel_size": EXCEL_PATH.stat().st_size if EXCEL_PATH.exists() else 0,
+        "cache_exists": CACHE_PATH.exists(),
+        "cache_size": CACHE_PATH.stat().st_size if CACHE_PATH.exists() else 0,
+        "cwd": os.getcwd(),
+        "data_dir": str(data_dir),
+        "files_in_dir": [f.name for f in data_dir.iterdir() if f.is_file()],
+        "restaurants_cached": len(_restaurants_cache) if _restaurants_cache is not None else None,
+    })
 
 
 @app.route("/api/districts")
