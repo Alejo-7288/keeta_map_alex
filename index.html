@@ -597,6 +597,12 @@
         right: 0;
         bottom: 0;
       }
+      /* Floating button on mobile */
+      #floating-route-btn {
+        bottom: 20px;
+        right: 20px;
+        z-index: 9999;
+      }
     }
   </style>
 </head>
@@ -1020,7 +1026,7 @@ function updateSelectionUI() {
   if (routePrev) routePrev.textContent = count;
   if (floatCount) floatCount.textContent = count;
   if (mapCount) mapCount.textContent = `${count} 間餐廳`;
-  if (floatBtn) floatBtn.classList.toggle('show', count > 0);
+  if (floatBtn) floatBtn.classList.toggle('show', count >= 2);
   if (calcBtn) calcBtn.disabled = count < 2;
 
   // Preview panel
