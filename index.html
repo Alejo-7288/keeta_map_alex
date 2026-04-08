@@ -303,6 +303,7 @@
     ══════════════════════════════════════════ */
     #view-map {
       display: none;
+      height: 100dvh;
       height: 100vh;
       flex-direction: column;
     }
@@ -330,7 +331,7 @@
       color: var(--muted);
     }
 
-    #map { flex: 1; }
+    #map { flex: 1; min-height: 50vh; width: 100%; }
 
     /* Back Button */
     #back-btn {
@@ -1178,10 +1179,12 @@ function switchToSelection() {
 // ══════════════════════════════════════════
 function initMap() {
   if (map) { map.invalidateSize(); return; }
-  map = L.map('map').setView([22.3193, 114.1694], 12);
+  map = L.map('map', { zoomControl: true, attributionControl: true }).setView([22.3193, 114.1694], 12);
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution: '© OpenStreetMap'
   }).addTo(map);
+  // Ensure tiles render after container is visible
+  setTimeout(() => map.invalidateSize({ animate: false }), 200);
 }
 
 function renderRouteStops() {
