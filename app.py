@@ -15,6 +15,7 @@ import queue
 import concurrent.futures
 from pathlib import Path
 from flask import Flask, request, jsonify, send_from_directory
+from flask_cors import CORS
 
 # macOS SSL fix
 ssl._create_default_https_context = ssl._create_unverified_context
@@ -34,6 +35,7 @@ _save_lock = threading.Lock()
 _geo_queue = queue.Queue()
 
 app = Flask(__name__, static_folder="static")
+CORS(app)  # Enable cross-origin requests for the frontend
 
 # ============ DATA LOADING ============
 _restaurants_cache = None
