@@ -346,18 +346,6 @@
       white-space: nowrap;
     }
     #back-btn:hover { background: var(--bg); border-color: var(--primary); color: var(--primary); }
-    #gps-btn {
-      background: white;
-      border: 1.5px solid var(--border);
-      border-radius: 10px;
-      padding: 8px 12px;
-      font-size: 16px;
-      cursor: pointer;
-      opacity: 0.7;
-      transition: all 0.2s;
-    }
-    #gps-btn:hover { opacity: 1; background: var(--bg); }
-    #gps-btn:active { opacity: 1; }
 
     /* Route Info Panel */
     #route-info-panel {
@@ -725,10 +713,10 @@
     <!-- Route Calculation -->
     <div id="route-calc-panel" style="padding:12px 16px;border-top:1px solid var(--border);background:white;display:none;">
       <div style="font-size:12px;color:var(--muted);margin-bottom:8px;">
-        💡 選擇 2 間或以上餐廳即可查看路線地圖
+        💡 選擇 2 間或以上餐廳即可計算最短路線
       </div>
       <button class="btn btn-primary btn-full" id="calc-route-btn" onclick="calculateAndShowRoute()" disabled>
-        <i class="fa-solid fa-map-location-dot"></i> 查看路線地圖
+        <i class="fa-solid fa-route"></i> 計算最短路線
       </button>
     </div>
   </div>
@@ -744,9 +732,7 @@
       <i class="fa-solid fa-arrow-left"></i> 返回選擇
     </button>
     <h2>🗺️ 路線地圖</h2>
-    <button id="gps-btn" onclick="toggleGPS()" style="background:none;border:none;cursor:pointer;font-size:20px;padding:4px;" title="開啟 GPS 追蹤">
-      📍
-    </button>
+    <button id="gps-btn" onclick="toggleGPS()" style="background:white;border:1.5px solid var(--border);border-radius:10px;padding:8px 12px;font-size:16px;cursor:pointer;opacity:0.7;">📍</button>
   </div>
 
   <!-- Map + Route Sidebar -->
@@ -797,16 +783,13 @@
 </div>
 
 <!-- Floating Route Button (shown in selection view) -->
-
-
-<!-- Toast -->
-<div id="toast"></div>
-
-<!-- Floating Route Button (shows when 2+ restaurants selected) -->
-<button id="floating-route-btn" onclick="switchToMap()" style="display:none;">
+<button id="floating-route-btn" onclick="switchToMap()">
   <i class="fa-solid fa-map-location-dot"></i>
   查看路線地圖 (<span id="floating-count">0</span>)
 </button>
+
+<!-- Toast -->
+<div id="toast"></div>
 
 <!-- Leaflet JS -->
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -1037,7 +1020,7 @@ function updateSelectionUI() {
   if (routePrev) routePrev.textContent = count;
   if (floatCount) floatCount.textContent = count;
   if (mapCount) mapCount.textContent = `${count} 間餐廳`;
-  if (floatBtn) floatBtn.classList.toggle('show', count >= 2);
+  if (floatBtn) floatBtn.classList.toggle('show', count > 0);
   if (calcBtn) calcBtn.disabled = count < 2;
 
   // Preview panel
@@ -1117,66 +1100,53 @@ function toggleGPS() {
   }
   
   if (gpsActive) {
-    // Stop GPS tracking
     if (gpsWatchId !== null) {
       navigator.geolocation.clearWatch(gpsWatchId);
       gpsWatchId = null;
     }
     gpsActive = false;
-    document.getElementById('gps-btn').style.opacity = '0.5';
+    document.getElementById('gps-btn').style.opacity = '0.7';
     showToast('📍 GPS 追蹤已關閉');
   } else {
-    // Start GPS tracking
     showToast('📍 正在開啟 GPS 追蹤...');
-    
     if (gpsWatchId !== null) {
       navigator.geolocation.clearWatch(gpsWatchId);
     }
-    
     gpsWatchId = navigator.geolocation.watchPosition(
       (pos) => {
         const lat = pos.coords.latitude;
         const lng = pos.coords.longitude;
-        const accuracy = pos.coords.accuracy;
-        
         if (!document.getElementById('view-map').classList.contains('active')) return;
-        
         const icon = L.divIcon({
           html: '<div style="background:#22c55e;color:white;width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;border:3px solid white;box-shadow:0 2px 8px rgba(0,0,0,0.3);"><i class="fa-solid fa-location-crosshairs"></i></div>',
           className: '', iconSize: [32, 32], iconAnchor: [16, 16]
         });
-        
         if (window.gpsMarker) {
           window.gpsMarker.setLatLng([lat, lng]);
         } else {
           window.gpsMarker = L.marker([lat, lng], { icon }).addTo(map).bindPopup('📍 我的位置');
         }
-        
-        // Update accuracy circle
         if (window.gpsCircle) {
           window.gpsCircle.setLatLng([lat, lng]);
-          window.gpsCircle.setRadius(accuracy);
+          window.gpsCircle.setRadius(pos.coords.accuracy);
         } else {
           window.gpsCircle = L.circle([lat, lng], {
-            radius: accuracy,
+            radius: pos.coords.accuracy,
             color: '#22c55e',
             fillColor: '#22c55e',
             fillOpacity: 0.1,
             weight: 1
           }).addTo(map);
         }
-        
-        // Auto-follow user
         map.setView([lat, lng], 16);
       },
       (err) => {
         showToast('❌ GPS 追蹤失敗，請檢查定位權限');
         gpsActive = false;
-        document.getElementById('gps-btn').style.opacity = '0.5';
+        document.getElementById('gps-btn').style.opacity = '0.7';
       },
       { enableHighAccuracy: true, maximumAge: 1000 }
     );
-    
     gpsActive = true;
     document.getElementById('gps-btn').style.opacity = '1';
     showToast('📍 GPS 追蹤已開啟');
@@ -1215,14 +1185,13 @@ function toggleRouteSidebar() {
 }
 
 function switchToSelection() {
-  // Stop GPS tracking when leaving map view
   if (gpsActive) {
     if (gpsWatchId !== null) {
       navigator.geolocation.clearWatch(gpsWatchId);
       gpsWatchId = null;
     }
     gpsActive = false;
-    document.getElementById('gps-btn').style.opacity = '0.5';
+    document.getElementById('gps-btn').style.opacity = '0.7';
   }
   document.getElementById('view-selection').classList.remove('hidden');
   document.getElementById('view-map').classList.remove('active');
@@ -1273,11 +1242,8 @@ function onDrop(e) {
   e.preventDefault();
   const dropIndex = parseInt(e.currentTarget.dataset.index);
   if (draggedIndex === null || draggedIndex === dropIndex) return;
-  
-  // Reorder routeStops
   const [moved] = routeStops.splice(draggedIndex, 1);
   routeStops.splice(dropIndex, 0, moved);
-  
   renderRouteStops();
   drawRoute();
 }
@@ -1370,7 +1336,6 @@ function reoptimizeRoute() {
   // Nearest-neighbor + 2-opt improvement
   if (routeStops.length < 2) return;
   
-  // Calculate current total distance
   const calcDist = (stops) => {
     let d = 0;
     for (let i = 1; i < stops.length; i++) {
@@ -1401,14 +1366,11 @@ function reoptimizeRoute() {
     improved = false;
     for (let i = 0; i < optimized.length - 1; i++) {
       for (let j = i + 2; j < optimized.length; j++) {
-        // Current: ... -> i -> i+1 -> ... -> j -> j+1 -> ...
-        // After swap: ... -> i -> j -> ... -> i+1 -> j+1 -> ...
         const dBefore = Math.hypot(optimized[i+1].lat - optimized[i].lat, optimized[i+1].lng - optimized[i].lng) +
                        Math.hypot(optimized[j].lat - optimized[j-1].lat, optimized[j].lng - optimized[j-1].lng);
         const dAfter = Math.hypot(optimized[j].lat - optimized[i].lat, optimized[j].lng - optimized[i].lng) +
                        Math.hypot(optimized[i+1].lat - optimized[j-1].lat, optimized[i+1].lng - optimized[j-1].lng);
         if (dAfter < dBefore) {
-          // Reverse segment between i+1 and j
           const segment = optimized.slice(i + 1, j + 1).reverse();
           optimized = [...optimized.slice(0, i + 1), ...segment, ...optimized.slice(j + 1)];
           improved = true;
