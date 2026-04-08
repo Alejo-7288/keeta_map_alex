@@ -39,18 +39,21 @@
 
     /* Left Panel - Filters & Stats */
     #filter-panel {
-      width: 320px;
-      min-width: 280px;
+      width: 380px;
+      min-width: 320px;
       background: var(--panel);
       border-right: 1px solid var(--border);
       display: flex;
       flex-direction: column;
       box-shadow: 2px 0 12px rgba(0,0,0,0.06);
+      height: 100vh;
+      overflow: hidden;
     }
 
     #filter-header {
       padding: 16px 16px 12px;
       border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
     }
     #filter-header h1 {
       font-size: 18px;
@@ -64,6 +67,14 @@
 
     #filter-controls {
       padding: 12px 14px;
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+      max-height: 45vh;
+      overflow-y: auto;
+    }
+
+    #gps-bar {
+      padding: 8px 14px;
       border-bottom: 1px solid var(--border);
       flex-shrink: 0;
     }
@@ -157,6 +168,8 @@
       flex: 1;
       overflow-y: auto;
       padding: 10px 12px;
+      min-height: 0;
+      -webkit-overflow-scrolling: touch;
     }
     #restaurant-list::-webkit-scrollbar { width: 4px; }
     #restaurant-list::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 2px; }
@@ -581,6 +594,13 @@
       </div>
     </div>
 
+    <!-- GPS Bar -->
+    <div id="gps-bar">
+      <button class="btn btn-secondary btn-sm" onclick="getCurrentLocation()" style="width:100%;justify-content:center;">
+        <i class="fa-solid fa-location-crosshairs"></i> 📍 定位我現在的位置
+      </button>
+    </div>
+
     <!-- Selection Bar -->
     <div id="selection-bar">
       <span class="count" id="selected-count-display">已選擇 0 間</span>
@@ -953,6 +973,36 @@ function removeFromRoute(poiId) {
   routeStops = routeStops.filter(s => s.poiId !== poiId);
   renderRestaurantList();
   updateSelectionUI();
+}
+
+function getCurrentLocation() {
+  if (!navigator.geolocation) {
+    showToast('❌ 你的瀏覽器不支援定位功能');
+    return;
+  }
+  showToast('📍 正在獲取位置...');
+  navigator.geolocation.getCurrentPosition(
+    (pos) => {
+      const lat = pos.coords.latitude;
+      const lng = pos.coords.longitude;
+      showToast(`📍 位置：${lat.toFixed(5)}, ${lng.toFixed(5)}`);
+      // Add as a waypoint if in map view
+      if (document.getElementById('view-map').classList.contains('active') && map) {
+        L.marker([lat, lng], {
+          icon: L.divIcon({
+            html: '<div style="background:#22c55e;color:white;width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;border:3px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.3);"><i class="fa-solid fa-user"></i></div>',
+            className: '', iconSize: [28, 28], iconAnchor: [14, 14]
+          })
+        }).addTo(map).bindPopup('📍 我的位置').openPopup();
+        map.setView([lat, lng], 15);
+      }
+    },
+    (err) => {
+      showToast('❌ 無法獲取位置，請檢查定位權限');
+      console.error(err);
+    },
+    { enableHighAccuracy: true, timeout: 10000 }
+  );
 }
 
 // ══════════════════════════════════════════
