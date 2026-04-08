@@ -783,10 +783,7 @@
 </div>
 
 <!-- Floating Route Button (shown in selection view) -->
-<button id="floating-route-btn" onclick="switchToMap()">
-  <i class="fa-solid fa-map-location-dot"></i>
-  查看路線地圖 (<span id="floating-count">0</span>)
-</button>
+
 
 <!-- Toast -->
 <div id="toast"></div>
@@ -1138,8 +1135,8 @@ function initMap() {
 function renderRouteStops() {
   const list = document.getElementById('route-stop-list');
   list.innerHTML = routeStops.map((s, i) => `
-    <div class="route-stop-item">
-      <div class="route-stop-num">${i + 1}</div>
+    <div class="route-stop-item" draggable="true" data-index="${i}" ondragstart="onDragStart(event)" ondragover="onDragOver(event)" ondrop="onDrop(event)" ondragend="onDragEnd(event)">
+      <div class="route-stop-num" style="cursor:grab;">${i + 1}</div>
       <div class="route-stop-info">
         <div class="route-stop-name">${escapeHtml(s.name)}</div>
         <div class="route-stop-addr">${escapeHtml(s.address || '')}</div>
@@ -1149,6 +1146,38 @@ function renderRouteStops() {
       </button>
     </div>
   `).join('');
+  document.getElementById('sidebar-stop-count').textContent = `(${routeStops.length})`;
+}
+
+let draggedIndex = null;
+
+function onDragStart(e) {
+  draggedIndex = parseInt(e.currentTarget.dataset.index);
+  e.currentTarget.style.opacity = '0.5';
+  e.dataTransfer.effectAllowed = 'move';
+}
+
+function onDragOver(e) {
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'move';
+}
+
+function onDrop(e) {
+  e.preventDefault();
+  const dropIndex = parseInt(e.currentTarget.dataset.index);
+  if (draggedIndex === null || draggedIndex === dropIndex) return;
+  
+  // Reorder routeStops
+  const [moved] = routeStops.splice(draggedIndex, 1);
+  routeStops.splice(dropIndex, 0, moved);
+  
+  renderRouteStops();
+  drawRoute();
+}
+
+function onDragEnd(e) {
+  e.currentTarget.style.opacity = '1';
+  draggedIndex = null;
 }
 
 async function drawRoute() {
@@ -1231,14 +1260,26 @@ async function calculateAndShowRoute() {
 }
 
 function reoptimizeRoute() {
-  // Simple nearest-neighbor optimization
+  // Nearest-neighbor + 2-opt improvement
   if (routeStops.length < 2) return;
-  const optimized = [routeStops[0]];
-  const remaining = routeStops.slice(1);
+  
+  // Calculate current total distance
+  const calcDist = (stops) => {
+    let d = 0;
+    for (let i = 1; i < stops.length; i++) {
+      d += Math.hypot(stops[i].lat - stops[i-1].lat, stops[i].lng - stops[i-1].lng) * 111;
+    }
+    return d;
+  };
+  
+  const originalDist = calcDist(routeStops);
+  
+  // Nearest neighbor initial solution
+  let optimized = [routeStops[0]];
+  let remaining = routeStops.slice(1);
   while (remaining.length > 0) {
     const last = optimized[optimized.length - 1];
-    let nearest = remaining[0];
-    let minDist = Infinity;
+    let nearest = remaining[0], minDist = Infinity;
     remaining.forEach(r => {
       const d = Math.hypot(r.lat - last.lat, r.lng - last.lng);
       if (d < minDist) { minDist = d; nearest = r; }
@@ -1246,10 +1287,40 @@ function reoptimizeRoute() {
     optimized.push(nearest);
     remaining.splice(remaining.indexOf(nearest), 1);
   }
+  
+  // 2-opt improvement
+  let improved = true;
+  while (improved) {
+    improved = false;
+    for (let i = 0; i < optimized.length - 1; i++) {
+      for (let j = i + 2; j < optimized.length; j++) {
+        // Current: ... -> i -> i+1 -> ... -> j -> j+1 -> ...
+        // After swap: ... -> i -> j -> ... -> i+1 -> j+1 -> ...
+        const dBefore = Math.hypot(optimized[i+1].lat - optimized[i].lat, optimized[i+1].lng - optimized[i].lng) +
+                       Math.hypot(optimized[j].lat - optimized[j-1].lat, optimized[j].lng - optimized[j-1].lng);
+        const dAfter = Math.hypot(optimized[j].lat - optimized[i].lat, optimized[j].lng - optimized[i].lng) +
+                       Math.hypot(optimized[i+1].lat - optimized[j-1].lat, optimized[i+1].lng - optimized[j-1].lng);
+        if (dAfter < dBefore) {
+          // Reverse segment between i+1 and j
+          const segment = optimized.slice(i + 1, j + 1).reverse();
+          optimized = [...optimized.slice(0, i + 1), ...segment, ...optimized.slice(j + 1)];
+          improved = true;
+        }
+      }
+    }
+  }
+  
+  const newDist = calcDist(optimized);
   routeStops = optimized;
   renderRouteStops();
   drawRoute();
-  showToast('🔄 路線已重新排序');
+  
+  const saved = (originalDist - newDist).toFixed(1);
+  if (saved > 0.1) {
+    showToast(`🔄 路線已優化，節省 ${saved} km！`);
+  } else {
+    showToast('🔄 路線已重新排序');
+  }
 }
 
 function clearAllRoute() {
