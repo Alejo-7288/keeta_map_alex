@@ -1,0 +1,1029 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>🚶 步行路線規劃 + 餐廳庫</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/font-awesome@6.4.0/css/all.min.css" />
+  <style>
+    :root {
+      --primary: #2563eb;
+      --bg: #f8fafc;
+      --panel: #ffffff;
+      --border: #e2e8f0;
+      --text: #1e293b;
+      --muted: #64748b;
+      --danger: #ef4444;
+      --success: #22c55e;
+      --warning: #f59e0b;
+      --orange: #f97316;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      height: 100vh;
+      display: flex;
+    }
+
+    /* ── Sidebar ── */
+    #sidebar {
+      width: 400px;
+      min-width: 340px;
+      background: var(--panel);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      z-index: 1000;
+      box-shadow: 2px 0 12px rgba(0,0,0,0.08);
+    }
+
+    /* ── Tabs ── */
+    .tab-bar {
+      display: flex;
+      border-bottom: 1px solid var(--border);
+    }
+    .tab-btn {
+      flex: 1;
+      padding: 12px 8px;
+      background: none;
+      border: none;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--muted);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      border-bottom: 3px solid transparent;
+      transition: all 0.2s;
+    }
+    .tab-btn:hover { color: var(--text); background: var(--bg); }
+    .tab-btn.active {
+      color: var(--primary);
+      border-bottom-color: var(--primary);
+      background: #eff6ff;
+    }
+
+    .tab-content { display: none; flex-direction: column; flex: 1; overflow: hidden; }
+    .tab-content.active { display: flex; }
+
+    /* ── Route Tab ── */
+    #sidebar-header {
+      padding: 14px 16px 10px;
+      border-bottom: 1px solid var(--border);
+    }
+    #sidebar-header h1 { font-size: 16px; font-weight: 700; margin-bottom: 2px; }
+    #sidebar-header p { font-size: 11px; color: var(--muted); }
+
+    #input-area { padding: 12px 14px; border-bottom: 1px solid var(--border); }
+    .input-row { display: flex; gap: 8px; margin-bottom: 8px; }
+    .input-row input {
+      flex: 1;
+      padding: 9px 12px;
+      border: 1.5px solid var(--border);
+      border-radius: 10px;
+      font-size: 14px;
+      outline: none;
+      transition: border 0.2s;
+    }
+    .input-row input:focus { border-color: var(--primary); }
+
+    .btn {
+      padding: 9px 14px;
+      border: none;
+      border-radius: 10px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s;
+      white-space: nowrap;
+    }
+    .btn-primary { background: var(--primary); color: white; }
+    .btn-primary:hover { background: #1d4ed8; }
+    .btn-primary:disabled { background: #93c5fd; cursor: not-allowed; }
+    .btn-secondary { background: var(--bg); color: var(--text); border: 1.5px solid var(--border); }
+    .btn-secondary:hover { background: #f1f5f9; }
+    .btn-orange { background: var(--orange); color: white; }
+    .btn-orange:hover { background: #ea580c; }
+    .btn-success { background: var(--success); color: white; }
+    .btn-success:hover { background: #16a34a; }
+    .btn-sm { padding: 5px 10px; font-size: 11px; border-radius: 8px; }
+
+    .btn-row { display: flex; gap: 8px; }
+    .btn-row .btn { flex: 1; justify-content: center; font-size: 12px; padding: 8px 10px; }
+
+    #address-list { flex: 1; overflow-y: auto; padding: 10px 12px; }
+
+    .empty-state {
+      text-align: center; padding: 40px 20px; color: var(--muted); font-size: 13px;
+    }
+    .empty-state i { font-size: 36px; opacity: 0.25; margin-bottom: 10px; display: block; }
+
+    .addr-item {
+      display: flex; align-items: center; gap: 10px;
+      padding: 10px 12px; border-radius: 10px; margin-bottom: 6px;
+      background: var(--bg); border: 1.5px solid var(--border);
+      transition: border-color 0.2s;
+    }
+    .addr-item.optimized { border-color: var(--success); background: #f0fdf4; }
+    .num {
+      width: 26px; height: 26px; border-radius: 50%;
+      background: var(--primary); color: white;
+      font-size: 12px; font-weight: 700;
+      display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+    }
+    .info { flex: 1; min-width: 0; }
+    .info .name { font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .info .detail { font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 1px; }
+    .del-btn {
+      background: none; border: none; color: var(--muted); cursor: pointer;
+      padding: 4px; border-radius: 6px; transition: all 0.2s; flex-shrink: 0;
+    }
+    .del-btn:hover { color: var(--danger); background: #fee2e2; }
+
+    #footer { padding: 14px; border-top: 1px solid var(--border); }
+    .stats-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 10px; }
+    .stat-box { background: var(--bg); border: 1.5px solid var(--border); border-radius: 10px; padding: 10px; text-align: center; }
+    .stat-box .val { font-size: 20px; font-weight: 700; color: var(--primary); }
+    .stat-box .lbl { font-size: 11px; color: var(--muted); margin-top: 2px; }
+    .btn-row-calc { display: flex; gap: 8px; }
+    .btn-row-calc .btn-calc { flex: 1; justify-content: center; padding: 12px; font-size: 14px; }
+
+    /* ── Restaurant DB Tab ── */
+    #db-header {
+      padding: 12px 14px 8px;
+      border-bottom: 1px solid var(--border);
+    }
+    #db-header h2 { font-size: 14px; font-weight: 700; margin-bottom: 6px; }
+    #db-header p { font-size: 11px; color: var(--muted); }
+
+    #db-filters {
+      padding: 10px 14px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    #district-select {
+      width: 100%; padding: 8px 12px; border: 1.5px solid var(--border);
+      border-radius: 10px; font-size: 13px; outline: none; background: white;
+      cursor: pointer;
+    }
+    #district-select:focus { border-color: var(--primary); }
+
+    .db-actions { display: flex; gap: 8px; }
+    .db-actions .btn { flex: 1; justify-content: center; font-size: 12px; padding: 8px; }
+
+    #restaurant-list {
+      flex: 1; overflow-y: auto; padding: 10px 12px;
+    }
+
+    .rest-item {
+      padding: 10px 12px; border-radius: 10px; margin-bottom: 6px;
+      background: var(--bg); border: 1.5px solid var(--border);
+      transition: all 0.2s;
+    }
+    .rest-item.geocoded { border-color: var(--success); background: #f0fdf4; }
+    .rest-item.geocoding { border-color: var(--warning); background: #fffbeb; }
+    .rest-item.error { border-color: #fca5a5; background: #fef2f2; }
+
+    .rest-top {
+      display: flex; align-items: flex-start; gap: 8px;
+    }
+    .rest-check {
+      width: 20px; height: 20px; margin-top: 2px;
+      cursor: pointer; accent-color: var(--primary); flex-shrink: 0;
+    }
+    .rest-name { font-size: 13px; font-weight: 600; flex: 1; }
+    .rest-district {
+      font-size: 10px; background: #dbeafe; color: var(--primary);
+      padding: 2px 7px; border-radius: 20px; font-weight: 600;
+      flex-shrink: 0;
+    }
+    .rest-address { font-size: 11px; color: var(--muted); margin-top: 3px; margin-left: 28px; }
+    .rest-meta { font-size: 10px; color: var(--muted); margin-top: 2px; margin-left: 28px; }
+    .rest-actions { display: flex; gap: 6px; margin-top: 6px; margin-left: 28px; }
+
+    .geo-badge {
+      font-size: 10px; padding: 2px 7px; border-radius: 20px; font-weight: 600;
+    }
+    .geo-pending { background: #f1f5f9; color: var(--muted); }
+    .geo-done { background: #dcfce7; color: #15803d; }
+    .geo-error { background: #fee2e2; color: #b91c1c; }
+
+    #db-footer {
+      padding: 12px 14px;
+      border-top: 1px solid var(--border);
+      background: #f8fafc;
+    }
+    #db-stats {
+      font-size: 11px; color: var(--muted); margin-bottom: 8px;
+      display: flex; justify-content: space-between;
+    }
+    #selected-count { font-weight: 700; color: var(--primary); }
+
+    /* ── Map ── */
+    #map { flex: 1; height: 100vh; }
+
+    /* ── Toast ── */
+    #toast {
+      position: fixed; bottom: 24px; left: 50%;
+      transform: translateX(-50%) translateY(80px);
+      background: var(--text); color: white;
+      padding: 12px 22px; border-radius: 50px;
+      font-size: 13px; font-weight: 600; z-index: 3000;
+      transition: transform 0.35s cubic-bezier(0.4,0,0.2,1);
+      display: flex; align-items: center; gap: 8px;
+      box-shadow: 0 6px 24px rgba(0,0,0,0.25);
+      max-width: calc(100vw - 40px);
+      white-space: nowrap;
+    }
+    #toast.show { transform: translateX(-50%) translateY(0); }
+    #toast.error { background: var(--danger); }
+    #toast.success { background: var(--success); }
+    #toast.warning { background: var(--warning); }
+
+    /* ── Autocomplete ── */
+    .autocomplete { position: relative; }
+    .autocomplete-dropdown {
+      position: absolute; top: 100%; left: 0; right: 0;
+      background: white; border: 1.5px solid var(--border);
+      border-radius: 10px; margin-top: 4px; z-index: 500;
+      max-height: 240px; overflow-y: auto;
+      display: none; box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+    }
+    .autocomplete-dropdown.open { display: block; }
+    .autocomplete-item {
+      padding: 10px 14px; cursor: pointer;
+      border-bottom: 1px solid var(--border); font-size: 13px;
+    }
+    .autocomplete-item:last-child { border-bottom: none; }
+    .autocomplete-item:hover { background: #f1f5f9; }
+    .autocomplete-item .main { font-weight: 600; }
+    .autocomplete-item .sub { font-size: 11px; color: var(--muted); margin-top: 1px; }
+
+    /* ── Misc ── */
+    .wp-num {
+      background: var(--primary); color: white;
+      width: 24px; height: 24px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 11px; font-weight: 700;
+      border: 2.5px solid white; box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+    }
+    #address-list::-webkit-scrollbar { width: 4px; }
+    #address-list::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 2px; }
+    #restaurant-list::-webkit-scrollbar { width: 4px; }
+    #restaurant-list::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 2px; }
+
+    .loading-row { text-align: center; padding: 20px; color: var(--muted); font-size: 13px; }
+    .loading-row i { display: block; font-size: 24px; margin-bottom: 8px; opacity: 0.4; }
+
+    @media (max-width: 768px) {
+      body { flex-direction: column; }
+      #sidebar { width: 100%; height: 50vh; border-right: none; border-bottom: 1px solid var(--border); }
+      #map { height: 50vh; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- Sidebar -->
+<div id="sidebar">
+  <!-- Tab Bar -->
+  <div class="tab-bar">
+    <button class="tab-btn active" id="tab-route" onclick="switchTab('route')">
+      <i class="fa-solid fa-route"></i> 路線規劃
+    </button>
+    <button class="tab-btn" id="tab-db" onclick="switchTab('db')">
+      <i class="fa-solid fa-utensils"></i> 餐廳庫
+    </button>
+  </div>
+
+  <!-- ── Route Tab ── -->
+  <div id="tab-route-content" class="tab-content active">
+    <div id="sidebar-header">
+      <h1>🚶 步行路線規劃</h1>
+      <p>輸入地址/地標，或點擊地圖新增地點</p>
+    </div>
+
+    <div id="input-area">
+      <div class="autocomplete">
+        <div class="input-row">
+          <input type="text" id="addr-input" placeholder="地址 / Google Maps 連結 / 座標(lat,lng)" autocomplete="off" />
+          <button class="btn btn-primary" id="add-btn" onclick="addFromInput()">
+            <i class="fa-solid fa-plus"></i> 加入
+          </button>
+        </div>
+        <div class="autocomplete-dropdown" id="autocomplete-dd"></div>
+      </div>
+      <div class="btn-row">
+        <button class="btn btn-secondary" onclick="getCurrentLocation()">
+          <i class="fa-solid fa-location-crosshairs"></i> 当前位置
+        </button>
+        <button class="btn btn-secondary" onclick="clearAll()">
+          <i class="fa-solid fa-trash"></i> 清除全部
+        </button>
+      </div>
+      <div style="padding:8px 0 2px;font-size:11px;color:var(--muted);text-align:center;">
+        💡 找不到地址？粘貼 Google Maps 連結 或 輸入座標 (22.xxxx, 114.xxxx)
+      </div>
+    </div>
+
+    <div id="address-list">
+      <div class="empty-state">
+        <i class="fa-solid fa-map-location-dot"></i>
+        尚未加入任何地點<br/>
+        <small>在上方輸入地址，或從「餐廳庫」加入</small>
+      </div>
+    </div>
+
+    <div id="footer">
+      <div class="stats-row" id="stats-row" style="display:none;">
+        <div class="stat-box">
+          <div class="val" id="stat-dist">—</div>
+          <div class="lbl">總距離 (km)</div>
+        </div>
+        <div class="stat-box">
+          <div class="val" id="stat-time">—</div>
+          <div class="lbl">步行時間 (分)</div>
+        </div>
+      </div>
+      <div class="btn-row-calc">
+        <button class="btn btn-primary btn-calc" id="calc-btn" onclick="calculateRoute()" disabled>
+          <i class="fa-solid fa-route"></i> 計算最短路線
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Restaurant DB Tab ── -->
+  <div id="tab-db-content" class="tab-content">
+    <div id="db-header">
+      <h2>🍽️ OpenRice 餐廳庫</h2>
+      <p>選擇餐廳 → Geocode → 加入路線</p>
+    </div>
+
+    <div id="db-filters">
+      <select id="district-select" onchange="filterRestaurants()">
+        <option value="">全部地區</option>
+      </select>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <label style="font-size:12px;cursor:pointer;display:flex;align-items:center;gap:5px;white-space:nowrap;">
+          <input type="checkbox" id="late-night-filter" onchange="filterRestaurants()" />
+          🌙 宵夜店
+        </label>
+        <label style="font-size:12px;cursor:pointer;display:flex;align-items:center;gap:5px;white-space:nowrap;">
+          <input type="checkbox" id="early-filter" onchange="filterRestaurants()" />
+          🌅 早市
+        </label>
+      </div>
+      <div class="db-actions">
+        <button class="btn btn-secondary" onclick="geocodeVisible()" title="Geocode 當前列表中未標記的餐廳">
+          <i class="fa-solid fa-map-pin"></i> Geocode 顯示中
+        </button>
+        <button class="btn btn-success" onclick="addSelectedToRoute()">
+          <i class="fa-solid fa-route"></i> 加入路線
+        </button>
+      </div>
+    </div>
+
+    <div id="restaurant-list">
+      <div class="loading-row">
+        <i class="fa-solid fa-spinner fa-spin"></i>
+        正在載入餐廳數據...
+      </div>
+    </div>
+
+    <div id="db-footer">
+      <div id="db-stats">
+        <span>餐廳: <strong id="total-count">0</strong></span>
+        <span>已 Geocode: <strong id="geocoded-count">0</strong></span>
+        <span>已選擇: <strong id="selected-count">0</strong></span>
+      </div>
+      <div class="btn-row">
+        <button class="btn btn-secondary btn-sm" onclick="selectAll()">全選</button>
+        <button class="btn btn-secondary btn-sm" onclick="deselectAll()">取消全選</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Map -->
+<div id="map"></div>
+
+<!-- Toast -->
+<div id="toast"></div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+// ═══════════════════════════════════════════════════
+// Config
+// ═══════════════════════════════════════════════════
+const API_BASE = window.location.origin;  // Auto-detect current host
+const PHOTON_URL = 'https://photon.komoot.io/api';
+const OSRM_URL = 'https://router.project-osrm.org/route/v1/foot';
+
+// ═══════════════════════════════════════════════════
+// State
+// ═══════════════════════════════════════════════════
+let addresses = [];
+let routeLines = [];
+let wpMarkers = [];
+let map, routingControl;
+let addrId = 0;
+let acTimeout;
+let allRestaurants = [];
+let selectedRestaurants = new Set();
+let districts = [];
+
+// ═══════════════════════════════════════════════════
+// Tab Switching
+// ═══════════════════════════════════════════════════
+function switchTab(tab) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+  document.getElementById('tab-' + tab).classList.add('active');
+  document.getElementById('tab-' + tab + '-content').classList.add('active');
+  if (tab === 'db') loadRestaurants();
+}
+
+// ═══════════════════════════════════════════════════
+// Map Init
+// ═══════════════════════════════════════════════════
+function initMap() {
+  map = L.map('map', { center: [22.3193, 114.1694], zoom: 13, zoomControl: true });
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '© OpenStreetMap', maxZoom: 19,
+  }).addTo(map);
+  map.on('click', async (e) => {
+    const { lat, lng } = e.latlng;
+    await addPoint(lat, lng, '📍 地圖選點');
+  });
+}
+
+// ═══════════════════════════════════════════════════
+// Autocomplete
+// ═══════════════════════════════════════════════════
+const addrInput = document.getElementById('addr-input');
+const acDD = document.getElementById('autocomplete-dd');
+
+addrInput.addEventListener('input', () => {
+  clearTimeout(acTimeout);
+  const q = addrInput.value.trim();
+  if (q.length < 2) { acDD.classList.remove('open'); return; }
+  acTimeout = setTimeout(() => searchAutocomplete(q), 300);
+});
+
+addrInput.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') { e.preventDefault(); addFromInput(); }
+});
+
+async function searchAutocomplete(q) {
+  try {
+    const res = await fetch(`${PHOTON_URL}?q=${encodeURIComponent(q + ' Hong Kong')}&limit=6`);
+    const data = await res.json();
+    const feats = data.features || [];
+    if (feats.length === 0) { acDD.classList.remove('open'); return; }
+    acDD.innerHTML = feats.map(f => {
+      const p = f.properties || {};
+      const name = p.name || p.city || p.district || q;
+      const city = [p.city, p.state, 'HK'].filter(Boolean).join(', ');
+      return `<div class="autocomplete-item" onclick="selectAc(${f.geometry.coordinates[1]}, ${f.geometry.coordinates[0]}, '${escapeHtml(name)}')">
+        <div class="main">${name}</div><div class="sub">${city}</div>
+      </div>`;
+    }).join('');
+    acDD.classList.add('open');
+  } catch { acDD.classList.remove('open'); }
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/'/g, "\\'").replace(/"/g, '\\"').replace(/\n/g, ' ');
+}
+
+function selectAc(lat, lng, name) {
+  acDD.classList.remove('open');
+  addrInput.value = name;
+  addPoint(lat, lng, name);
+}
+
+// ═══════════════════════════════════════════════════
+// Add from Input
+// ═══════════════════════════════════════════════════
+function extractCoordsFromGoogleUrl(url) {
+  const m = url.match(/@(-?\d+\.?\d*),(-?\d+\.?\d*)/);
+  return m ? { lat: parseFloat(m[1]), lng: parseFloat(m[2]) } : null;
+}
+
+async function addFromInput() {
+  const q = addrInput.value.trim();
+  if (!q) return;
+  acDD.classList.remove('open');
+
+  const btn = document.getElementById('add-btn');
+  btn.disabled = true;
+  btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
+
+  try {
+    if (q.includes('google.com/maps') || q.includes('maps.app.goo.gl')) {
+      const coords = extractCoordsFromGoogleUrl(q);
+      if (coords) { await addPoint(coords.lat, coords.lng, 'Google Maps 位置'); addrInput.value = ''; return; }
+    }
+
+    const coordMatch = q.match(/^(-?\d+\.?\d*)[,\s]+(-?\d+\.?\d*)$/);
+    if (coordMatch) {
+      const lat = parseFloat(coordMatch[1]), lng = parseFloat(coordMatch[2]);
+      if (lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) {
+        await addPoint(lat, lng, `座標 (${lat.toFixed(5)}, ${lng.toFixed(5)})`);
+        addrInput.value = '';
+        return;
+      }
+    }
+
+    const res = await fetch(`${PHOTON_URL}?q=${encodeURIComponent(q + ', Hong Kong')}&limit=5`);
+    const data = await res.json();
+    const feats = (data.features || []).filter(f => {
+      const p = f.properties || {};
+      return (p.country || '').toLowerCase().includes('hong kong') || (p.city || '').toLowerCase().includes('hong kong');
+    });
+    const best = feats[0] || data.features && data.features[0];
+    if (best) {
+      const lat = best.geometry.coordinates[1], lng = best.geometry.coordinates[0];
+      const p = best.properties || {};
+      const name = p.name || p.city || q;
+      await addPoint(lat, lng, name);
+      addrInput.value = '';
+    } else {
+      throw new Error('找不到地址');
+    }
+  } catch (e) { toast(e.message || '加入失敗', 'error'); }
+  finally { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-plus"></i> 加入'; }
+}
+
+// ═══════════════════════════════════════════════════
+// Add Point
+// ═══════════════════════════════════════════════════
+async function addPoint(lat, lng, name) {
+  const id = ++addrId;
+  let display = name;
+
+  try {
+    const res = await fetch(`https://photon.komoot.io/reverse?lat=${lat}&lon=${lng}`);
+    const data = await res.json();
+    if (data.features && data.features.length > 0) {
+      const p = data.features[0].properties;
+      display = [p.name, p.city, p.state].filter(Boolean).join(', ');
+    }
+  } catch {}
+
+  addresses.push({ id, name, lat, lng, address: display, optimized: false });
+  const marker = L.circleMarker([lat, lng], {
+    radius: 10, fillColor: '#2563eb', color: 'white', weight: 2.5, fillOpacity: 0.9,
+  }).addTo(map);
+  marker.bindTooltip(name, { permanent: false, direction: 'top' });
+  window['_m' + id] = marker;
+
+  renderList();
+  updateCalcBtn();
+  toast(`✅ 已加入：${name}`, 'success');
+
+  if (addresses.length === 1) map.setView([lat, lng], 15);
+}
+
+// ═══════════════════════════════════════════════════
+// Route List
+// ═══════════════════════════════════════════════════
+function renderList() {
+  const list = document.getElementById('address-list');
+  if (addresses.length === 0) {
+    list.innerHTML = `<div class="empty-state"><i class="fa-solid fa-map-location-dot"></i>尚未加入任何地點<br/><small>在上方輸入地址，或從「餐廳庫」加入</small></div>`;
+    return;
+  }
+  list.innerHTML = addresses.map((a, i) => `
+    <div class="addr-item ${a.optimized ? 'optimized' : ''}" data-id="${a.id}">
+      <div class="num">${i + 1}</div>
+      <div class="info">
+        <div class="name">${escapeHtml(a.name)}</div>
+        <div class="detail">${escapeHtml(a.address.substring(0, 60))}</div>
+      </div>
+      <button class="del-btn" onclick="deleteAddr(${a.id})"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+  `).join('');
+}
+
+function updateCalcBtn() {
+  document.getElementById('calc-btn').disabled = addresses.length < 2;
+}
+
+function deleteAddr(id) {
+  const idx = addresses.findIndex(a => a.id === id);
+  if (idx === -1) return;
+  if (window['_m' + id]) map.removeLayer(window['_m' + id]);
+  addresses.splice(idx, 1);
+  addresses.forEach((a, i) => a.num = i + 1);
+  renderList();
+  updateCalcBtn();
+  clearRoute();
+}
+
+function clearAll() {
+  addresses.forEach(a => { if (window['_m' + a.id]) map.removeLayer(window['_m' + a.id]); });
+  addresses = [];
+  clearRoute();
+  renderList();
+  updateCalcBtn();
+  document.getElementById('stats-row').style.display = 'none';
+  map.setView([22.3193, 114.1694], 12);
+}
+
+// ═══════════════════════════════════════════════════
+// Get Current Location
+// ═══════════════════════════════════════════════════
+function getCurrentLocation() {
+  if (!navigator.geolocation) { toast('瀏覽器不支援定位', 'error'); return; }
+  toast('📍 正在取得位置...', 'info');
+  navigator.geolocation.getCurrentPosition(
+    async (pos) => {
+      const { latitude: lat, longitude: lng } = pos.coords;
+      await addPoint(lat, lng, '📍 我的位置');
+    },
+    (err) => toast('無法取得位置：' + err.message, 'error')
+  );
+}
+
+// ═══════════════════════════════════════════════════
+// Routing
+// ═══════════════════════════════════════════════════
+function haversine(lat1, lng1, lat2, lng2) {
+  const R = 6371;
+  const d = (a, b) => (b - a) * Math.PI / 180;
+  const dl = d(lat1, lat2), dlng = d(lng1, lng2);
+  const a = Math.sin(dl/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dlng/2)**2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
+
+function optimizePath(pts) {
+  if (pts.length <= 1) return pts;
+  const visited = new Set(), path = [];
+  let cur = pts[0];
+  visited.add(cur.id);
+  path.push(cur);
+  while (visited.size < pts.length) {
+    let best = null, bestD = Infinity;
+    for (const p of pts) {
+      if (visited.has(p.id)) continue;
+      const d = haversine(cur.lat, cur.lng, p.lat, p.lng);
+      if (d < bestD) { bestD = d; best = p; }
+    }
+    if (best) { path.push(best); visited.add(best.id); cur = best; }
+  }
+  return path;
+}
+
+function clearRoute() {
+  routeLines.forEach(l => map.removeLayer(l));
+  routeLines = [];
+  wpMarkers.forEach(m => map.removeLayer(m));
+  wpMarkers = [];
+  addresses.forEach(a => a.optimized = false);
+}
+
+async function calculateRoute() {
+  if (addresses.length < 2) return;
+  const btn = document.getElementById('calc-btn');
+  btn.disabled = true;
+  btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> 計算中...';
+  toast('🧠 正在計算最短路線...', 'info');
+  clearRoute();
+
+  const opt = optimizePath([...addresses]);
+  opt.forEach(a => a.optimized = true);
+  renderList();
+
+  try {
+    const coords = opt.map(a => `${a.lng},${a.lat}`).join(';');
+    const res = await fetch(`${OSRM_URL}/${coords}?overview=full&geometries=geojson`);
+    if (!res.ok) throw new Error('路線服務暫時不可用');
+    const data = await res.json();
+    const route = data.routes[0];
+    if (!route) throw new Error('找不到路線');
+
+    const distKm = (route.distance / 1000).toFixed(2);
+    const timeMin = Math.round(route.duration / 60);
+    const geo = route.geometry.coordinates.map(c => [c[1], c[0]]);
+
+    const poly = L.polyline(geo, { color: '#2563eb', weight: 5, opacity: 0.85, dashArray: '12, 8' }).addTo(map);
+    routeLines.push(poly);
+
+    opt.forEach((a, i) => {
+      L.circleMarker([a.lat, a.lng], { radius: 14, fillColor: '#2563eb', color: 'white', weight: 3, fillOpacity: 1, zIndexOffset: 1000 }).addTo(map);
+      const label = L.divIcon({ html: `<div class="wp-num">${i+1}</div>`, className: '', iconSize: [26, 26], iconAnchor: [13, 13] });
+      const nm = L.marker([a.lat, a.lng], { icon: label, interactive: false }).addTo(map);
+      wpMarkers.push(nm);
+    });
+
+    map.fitBounds(poly.getBounds(), { padding: [60, 60] });
+
+    document.getElementById('stat-dist').textContent = distKm;
+    document.getElementById('stat-time').textContent = timeMin;
+    document.getElementById('stats-row').style.display = 'grid';
+    toast(`✅ 路線完成：${distKm}km，約 ${timeMin} 分鐘`, 'success');
+
+  } catch (e) {
+    console.error(e);
+    const geo = opt.map(a => [a.lat, a.lng]);
+    const poly = L.polyline(geo, { color: '#f59e0b', weight: 4, opacity: 0.7, dashArray: '8, 8' }).addTo(map);
+    routeLines.push(poly);
+    opt.forEach((a, i) => {
+      const label = L.divIcon({ html: `<div class="wp-num">${i+1}</div>`, className: '', iconSize: [26, 26], iconAnchor: [13, 13] });
+      wpMarkers.push(L.marker([a.lat, a.lng], { icon: label, interactive: false }).addTo(map));
+    });
+    map.fitBounds(poly.getBounds(), { padding: [60, 60] });
+    let total = 0;
+    for (let i = 0; i < opt.length - 1; i++) total += haversine(opt[i].lat, opt[i].lng, opt[i+1].lat, opt[i+1].lng);
+    const timeMin = Math.round(total / 5 * 60);
+    document.getElementById('stat-dist').textContent = total.toFixed(2);
+    document.getElementById('stat-time').textContent = timeMin;
+    document.getElementById('stats-row').style.display = 'grid';
+    toast(`⚠️ 直線模式（參考值）：約 ${total.toFixed(1)}km，${timeMin} 分`, 'warning');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '<i class="fa-solid fa-route"></i> 重新計算';
+  }
+}
+
+// ═══════════════════════════════════════════════════
+// Restaurant Database
+// ═══════════════════════════════════════════════════
+
+async function loadRestaurants() {
+  if (allRestaurants.length > 0) { renderRestaurantList(); return; }
+
+  try {
+    const res = await fetch(`${API_BASE}/api/districts`);
+    districts = await res.json();
+
+    const sel = document.getElementById('district-select');
+    sel.innerHTML = '<option value="">全部地區</option>' +
+      districts.map(d => `<option value="${d}">${d}</option>`).join('');
+
+    const res2 = await fetch(`${API_BASE}/api/restaurants`);
+    allRestaurants = await res2.json();
+
+    renderRestaurantList();
+    updateDbStats();
+
+  } catch (e) {
+    console.error(e);
+    document.getElementById('restaurant-list').innerHTML =
+      `<div class="empty-state"><i class="fa-solid fa-triangle-exclamation"></i>
+      無法載入餐廳數據<br/><small>請確保 Flask app 在 port 19801 運行中</small></div>`;
+  }
+}
+
+function filterRestaurants() {
+  renderRestaurantList();
+  updateDbStats();
+}
+
+function renderRestaurantList() {
+  const list = document.getElementById('restaurant-list');
+  const district = document.getElementById('district-select').value;
+  const isLateNight = document.getElementById('late-night-filter').checked;
+  const isEarly = document.getElementById('early-filter').checked;
+
+  let filtered = allRestaurants;
+  if (district) filtered = filtered.filter(r => r.district === district);
+  if (isLateNight) filtered = filtered.filter(r => r.is_late_night);
+  if (isEarly) filtered = filtered.filter(r => r.is_early);
+
+  if (filtered.length === 0) {
+    list.innerHTML = `<div class="empty-state"><i class="fa-solid fa-utensils"></i>沒有餐廳</div>`;
+    return;
+  }
+
+  list.innerHTML = filtered.map(r => {
+    const isSelected = selectedRestaurants.has(r.poiId);
+    const geoClass = r.geocoded ? 'geocoded' : (r.geocoded === false ? 'error' : '');
+    const geoBadge = r.geocoded
+      ? '<span class="geo-badge geo-done">📍 已定位</span>'
+      : '<span class="geo-badge geo-pending">○ 未定位</span>';
+
+    const tags = [];
+    if (r.is_late_night) tags.push('<span style="background:#1e293b;color:#fbbf24;font-size:10px;padding:2px 6px;border-radius:10px;margin-right:4px;">🌙 宵夜</span>');
+    if (r.is_early) tags.push('<span style="background:#fef3c7;color:#92400e;font-size:10px;padding:2px 6px;border-radius:10px;margin-right:4px;">🌅 早市</span>');
+
+    return `
+    <div class="rest-item ${geoClass}" id="rest-${r.poiId}">
+      <div class="rest-top">
+        <input type="checkbox" class="rest-check" id="chk-${r.poiId}"
+          ${isSelected ? 'checked' : ''}
+          onchange="toggleRest('${r.poiId}')" />
+        <div class="rest-name">${escapeHtml(r.name)}</div>
+        <div class="rest-district">${r.district}</div>
+      </div>
+      ${tags.length > 0 ? `<div style="margin:3px 0 2px 28px;">${tags.join('')}</div>` : ''}
+      <div class="rest-address">${escapeHtml(r.address)}</div>
+      <div class="rest-meta">${r.phone ? '☎ ' + r.phone + ' · ' : ''}${r.hours ? r.hours.split(';')[0] : ''}</div>
+      <div class="rest-actions">
+        ${geoBadge}
+        ${!r.geocoded ? `<button class="btn btn-secondary btn-sm" onclick="geocodeOne('${r.poiId}')">
+          <i class="fa-solid fa-map-pin"></i> Geocode</button>` : ''}
+        <button class="btn btn-primary btn-sm" onclick="addRestToRoute('${r.poiId}')"
+          ${!r.geocoded ? 'disabled' : ''}>
+          <i class="fa-solid fa-plus"></i> 加入
+        </button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function updateDbStats() {
+  const district = document.getElementById('district-select').value;
+  const isLateNight = document.getElementById('late-night-filter').checked;
+  const isEarly = document.getElementById('early-filter').checked;
+
+  let filtered = allRestaurants;
+  if (district) filtered = filtered.filter(r => r.district === district);
+  if (isLateNight) filtered = filtered.filter(r => r.is_late_night);
+  if (isEarly) filtered = filtered.filter(r => r.is_early);
+
+  const geocoded = filtered.filter(r => r.geocoded).length;
+  document.getElementById('total-count').textContent = filtered.length;
+  document.getElementById('geocoded-count').textContent = geocoded;
+  document.getElementById('selected-count').textContent = selectedRestaurants.size;
+}
+
+function toggleRest(poiId) {
+  if (selectedRestaurants.has(poiId)) selectedRestaurants.delete(poiId);
+  else selectedRestaurants.add(poiId);
+  updateDbStats();
+}
+
+function selectAll() {
+  const district = document.getElementById('district-select').value;
+  const filtered = district ? allRestaurants.filter(r => r.district === district) : allRestaurants;
+  filtered.forEach(r => selectedRestaurants.add(r.poiId));
+  renderRestaurantList();
+  updateDbStats();
+}
+
+function deselectAll() {
+  selectedRestaurants.clear();
+  renderRestaurantList();
+  updateDbStats();
+}
+
+// Geocode one restaurant
+async function geocodeOne(poiId) {
+  const el = document.getElementById('rest-' + poiId);
+  const rest = allRestaurants.find(r => r.poiId === poiId);
+  if (!rest) return;
+
+  el.classList.remove('geocoded', 'error');
+  el.classList.add('geocoding');
+
+  try {
+    const res = await fetch(`${API_BASE}/api/geocode?poiId=${encodeURIComponent(poiId)}&address=${encodeURIComponent(rest.address)}`);
+    const data = await res.json();
+
+    if (data.error) {
+      el.classList.remove('geocoding');
+      el.classList.add('error');
+      toast(`⚠️ ${rest.name}: ${data.error}`, 'warning');
+    } else {
+      rest.lat = data.lat;
+      rest.lng = data.lng;
+      rest.geocoded = true;
+      el.classList.remove('geocoding', 'error');
+      el.classList.add('geocoded');
+      el.querySelector('.geo-badge')?.remove();
+      // Add geocoded badge
+      const actions = el.querySelector('.rest-actions');
+      const geoBadge = document.createElement('span');
+      geoBadge.className = 'geo-badge geo-done';
+      geoBadge.textContent = '📍 已定位';
+      actions.prepend(geoBadge);
+      // Enable add button
+      const addBtn = el.querySelector('.btn-primary');
+      if (addBtn) addBtn.disabled = false;
+      toast(`✅ ${rest.name}: ${data.lat.toFixed(5)}, ${data.lng.toFixed(5)}`, 'success');
+    }
+  } catch (e) {
+    el.classList.remove('geocoding');
+    el.classList.add('error');
+    toast(`❌ ${rest.name}: 網絡錯誤`, 'error');
+  }
+  updateDbStats();
+}
+
+// Geocode all visible ungeocoded restaurants
+async function geocodeVisible() {
+  const district = document.getElementById('district-select').value;
+  const filtered = district ? allRestaurants.filter(r => r.district === district) : allRestaurants;
+  const ungeocoded = filtered.filter(r => !r.geocoded);
+
+  if (ungeocoded.length === 0) {
+    toast('所有顯示的餐廳都已定位', 'info');
+    return;
+  }
+
+  toast(`🔄 正在批量 Geocode ${ungeocoded.length} 間餐廳...`, 'info');
+
+  // Batch geocode via backend
+  try {
+    const res = await fetch(`${API_BASE}/api/geocode_batch`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        items: ungeocoded.map(r => ({ poiId: r.poiId, address: r.address }))
+      })
+    });
+    const results = await res.json();
+
+    let ok = 0, fail = 0;
+    for (const result of results) {
+      const rest = allRestaurants.find(r => r.poiId === result.poiId);
+      if (!rest) continue;
+
+      if (result.lat && result.lng) {
+        rest.lat = result.lat;
+        rest.lng = result.lng;
+        rest.geocoded = true;
+        ok++;
+      } else {
+        fail++;
+      }
+    }
+
+    renderRestaurantList();
+    updateDbStats();
+    toast(`✅ 完成：${ok} 間已定位，${fail} 間失敗`, fail > 0 ? 'warning' : 'success');
+
+  } catch (e) {
+    toast('批量 Geocode 失敗', 'error');
+  }
+}
+
+// Add single restaurant to route
+async function addRestToRoute(poiId) {
+  const rest = allRestaurants.find(r => r.poiId === poiId);
+  if (!rest || !rest.geocoded) return;
+  await addPoint(rest.lat, rest.lng, rest.name);
+  // Auto-switch to route tab
+  switchTab('route');
+}
+
+// Add all selected restaurants to route
+async function addSelectedToRoute() {
+  if (selectedRestaurants.size === 0) {
+    toast('請先選擇餐廳', 'warning');
+    return;
+  }
+
+  let added = 0;
+  for (const poiId of selectedRestaurants) {
+    const rest = allRestaurants.find(r => r.poiId === poiId);
+    if (rest && rest.geocoded) {
+      await addPoint(rest.lat, rest.lng, rest.name);
+      added++;
+    }
+  }
+
+  if (added > 0) {
+    toast(`✅ 已加入 ${added} 間餐廳到路線`, 'success');
+    selectedRestaurants.clear();
+    renderRestaurantList();
+    updateDbStats();
+    switchTab('route');
+  } else {
+    toast('沒有已定位的餐廳被選擇', 'warning');
+  }
+}
+
+// ═══════════════════════════════════════════════════
+// Toast
+// ═══════════════════════════════════════════════════
+let toastT;
+function toast(msg, type = 'info') {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = 'show ' + type;
+  clearTimeout(toastT);
+  toastT = setTimeout(() => { el.className = ''; }, 4000);
+}
+
+// ═══════════════════════════════════════════════════
+// Init
+// ═══════════════════════════════════════════════════
+initMap();
+</script>
+</body>
+</html>
