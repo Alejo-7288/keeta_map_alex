@@ -1,9 +1,7 @@
 __pycache__/
 *.pyc
 *.pyo
-geocode_cache.json
 *.log
 .DS_Store
 node_modules/
 .env
-geocode_cache.json
