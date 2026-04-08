@@ -2,13 +2,10 @@
 <html lang="zh-Hant">
 <head>
   <meta charset="UTF-8">
-  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
-  <meta http-equiv="Pragma" content="no-cache">
-  <meta http-equiv="Expires" content="0">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>🍽️ 餐廳路線規劃</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-  
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/font-awesome@6.4.0/css/all.min.css" />
   <style>
     :root {
       --primary: #2563eb;
@@ -330,7 +327,7 @@
       color: var(--muted);
     }
 
-    #map { flex: 1; min-height: 300px; height: 100%; width: 100%; }
+    #map { flex: 1; }
 
     /* Back Button */
     #back-btn {
@@ -596,7 +593,7 @@
     }
   </style>
 </head>
-<div id="debug-ts" style="display:none">1775675593</div><body onload="window.__ts=1775675593;document.getElementById('restaurant-list').innerHTML='<div class=\"loading-row\"><i class=\"🔄 fa-spin\"></i><br/>正在載入...</div>'">
+<body>
 
 <!-- ══════════════════════════════════════════
      VIEW 1: FULL PAGE RESTAURANT SELECTION
@@ -651,7 +648,7 @@
     <!-- GPS Bar -->
     <div id="gps-bar">
       <button class="btn btn-secondary btn-sm" onclick="getCurrentLocation()" style="width:100%;justify-content:center;">
-        <i class="📍"></i> 📍 定位我現在的位置
+        <i class="fa-solid fa-location-crosshairs"></i> 📍 定位我現在的位置
       </button>
     </div>
 
@@ -664,17 +661,17 @@
     <!-- Action Buttons -->
     <div id="action-bar">
       <button class="btn btn-secondary btn-sm" onclick="selectAllVisible()" style="font-size:12px;">
-        <i class="✓-square"></i> 全選
+        <i class="fa-solid fa-check-square"></i> 全選
       </button>
       <button class="btn btn-secondary btn-sm" onclick="deselectAllVisible()" style="font-size:12px;">
-        <i class="⬜"></i> 取消全選
+        <i class="fa-solid fa-square"></i> 取消全選
       </button>
     </div>
 
     <!-- Restaurant List -->
     <div id="restaurant-list">
       <div class="loading-row">
-        <i class="🔄 fa-spin"></i><br/>
+        <i class="fa-solid fa-spinner fa-spin"></i><br/>
         載入餐廳數據中...
       </div>
     </div>
@@ -700,7 +697,7 @@
     <!-- Route Preview List -->
     <div id="selected-preview" style="flex:1;overflow-y:auto;padding:12px;">
       <div class="empty-state" id="preview-empty">
-        <i class="👆"></i>
+        <i class="fa-solid fa-hand-pointer"></i>
         左側選擇餐廳<br/>
         <small>已選擇的餐廳會顯示在這裡</small>
       </div>
@@ -712,7 +709,7 @@
         💡 選擇 2 間或以上餐廳即可計算最短路線
       </div>
       <button class="btn btn-primary btn-full" id="calc-route-btn" onclick="calculateAndShowRoute()" disabled>
-        <i class="🗺️"></i> 計算最短路線
+        <i class="fa-solid fa-route"></i> 計算最短路線
       </button>
     </div>
   </div>
@@ -725,7 +722,7 @@
   <!-- Top Bar -->
   <div id="map-top-bar">
     <button id="back-btn" onclick="switchToSelection()">
-      <i class="←"></i> 返回選擇
+      <i class="fa-solid fa-arrow-left"></i> 返回選擇
     </button>
     <h2>🗺️ 路線地圖</h2>
     <span id="map-selected-count">0 間餐廳</span>
@@ -743,10 +740,10 @@
       <div id="route-stop-list"></div>
       <div id="map-actions">
         <button class="btn btn-secondary" onclick="clearAllRoute()" style="flex:1;font-size:12px;">
-          <i class="🗑️"></i> 清除
+          <i class="fa-solid fa-trash"></i> 清除
         </button>
         <button class="btn btn-primary" onclick="reoptimizeRoute()" style="flex:1;font-size:12px;">
-          <i class="🔄"></i> 重新排序
+          <i class="fa-solid fa-arrows-spin"></i> 重新排序
         </button>
       </div>
     </div>
@@ -766,10 +763,10 @@
     </div>
     <div class="btn-row">
       <button class="btn btn-secondary" onclick="clearAllRoute()">
-        <i class="🗑️"></i> 清除
+        <i class="fa-solid fa-trash"></i> 清除
       </button>
       <button class="btn btn-primary" onclick="reoptimizeRoute()" style="flex:1;">
-        <i class="🔄"></i> 重新計算
+        <i class="fa-solid fa-arrows-spin"></i> 重新計算
       </button>
     </div>
   </div>
@@ -777,7 +774,7 @@
 
 <!-- Floating Route Button (shown in selection view) -->
 <button id="floating-route-btn" onclick="switchToMap()">
-  <i class="🗺️-location-dot"></i>
+  <i class="fa-solid fa-map-location-dot"></i>
   查看路線地圖 (<span id="floating-count">0</span>)
 </button>
 
@@ -804,129 +801,64 @@ let filterEarly = false;
 // INIT
 // ══════════════════════════════════════════
 async function init() {
-  // Immediately show loading state in restaurant-list
-  document.getElementById('restaurant-list').innerHTML = `
-    <div class="loading-row">
-      <i class="🔄 fa-spin"></i><br/>
-      正在連接伺服器...
-    </div>`;
-  
-  showToast('🚀 載入地區列表...');
+  showToast('🚀 載入餐廳數據中...（請稍候）');
   try {
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 15000);
+    const timeout = setTimeout(() => controller.abort(), 30000);
     
-    const resp = await fetch(`${API_BASE}/api/districts`, {
+    const resp = await fetch(`${API_BASE}/api/restaurants`, {
       signal: controller.signal
     });
     clearTimeout(timeout);
     
     if (!resp.ok) throw new Error('API error: ' + resp.status);
     
-    const districts = await resp.json();
-    if (!Array.isArray(districts) || districts.length === 0) {
-      throw new Error('地區數據格式錯誤');
+    const text = await resp.text();
+    allRestaurants = JSON.parse(text);
+    
+    if (!Array.isArray(allRestaurants) || allRestaurants.length === 0) {
+      throw new Error('數據格式錯誤或為空');
     }
     
-    // Populate district select
-    const sel = document.getElementById('district-select');
-    sel.innerHTML = '<option value="">全部地區</option>' +
-      districts.map(d => `<option value="${d}">${d}</option>`).join('');
-    
-    document.getElementById('total-db-count').textContent = districts.length + ' 個地區';
-    showToast(`✅ ${districts.length} 個地區已載入，請選擇地區`);
-    
-    // Show "select a district" message
-    document.getElementById('restaurant-list').innerHTML = `
-      <div class="empty-state">
-        <i class="👆"></i>
-        請先選擇地區<br/>
-        <small>選擇地區後將自動載入該區餐廳</small>
-      </div>`;
+    document.getElementById('total-db-count').textContent = allRestaurants.length;
+    loadDistrictOptions();
+    renderRestaurantList();
+    showToast(`✅ ${allRestaurants.length} 間餐廳已載入`);
   } catch (e) {
     if (e.name === 'AbortError') {
-      document.getElementById('restaurant-list').innerHTML = `
-        <div class="empty-state">
-          <i class="📶"></i><br/>
-          載入超時（15秒）<br/>
-          <small>請檢查網絡連線<br/>或稍後再試</small>
-        </div>`;
       showToast('❌ 載入超時，請檢查網絡連線');
     } else {
-      document.getElementById('restaurant-list').innerHTML = `
-        <div class="empty-state">
-          <i class="❌"></i><br/>
-          載入失敗：${e.message}<br/>
-          <small>請檢查網絡或稍後再試</small>
-        </div>`;
       showToast('❌ 無法載入數據庫：' + e.message);
     }
     console.error('Init error:', e);
+    document.getElementById('restaurant-list').innerHTML = `
+      <div class="empty-state">
+        <i class="fa-solid fa-circle-exclamation"></i>
+        載入失敗：${e.message}<br/>
+        <small>請檢查網絡或重新整理頁面</small>
+      </div>`;
   }
+}
+
+function loadDistrictOptions() {
+  const districts = [...new Set(allRestaurants.map(r => r.district).filter(Boolean))].sort();
+  const sel = document.getElementById('district-select');
+  sel.innerHTML = '<option value="">全部地區</option>' +
+    districts.map(d => `<option value="${d}">${d}</option>`).join('');
 }
 
 // ══════════════════════════════════════════
 // RENDER RESTAURANT LIST
 // ══════════════════════════════════════════
-
-// Lazy-load cache: {district: [restaurants]}
-const districtCache = {};
-let currentDistrictData = [];  // Current loaded restaurants
-let isLoadingDistrict = false;
-
-async function loadDistrictData(district) {
-  if (districtCache[district]) {
-    return districtCache[district];
-  }
-  
-  if (isLoadingDistrict) return [];
-  isLoadingDistrict = true;
-  
-  const list = document.getElementById('restaurant-list');
-  list.innerHTML = `<div class="loading-row"><i class="🔄 fa-spin"></i><br/>載入 ${district} 餐廳中...</div>`;
-  
-  try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 20000);
-    const resp = await fetch(`${API_BASE}/api/restaurants?district=${encodeURIComponent(district)}`, {
-      signal: controller.signal
-    });
-    clearTimeout(timeout);
-    
-    if (!resp.ok) throw new Error('API error');
-    const data = await resp.json();
-    districtCache[district] = data;
-    return data;
-  } catch (e) {
-    console.error('Load district error:', e);
-    return [];
-  } finally {
-    isLoadingDistrict = false;
-  }
-}
-
-async function renderRestaurantList() {
+function renderRestaurantList() {
   const list = document.getElementById('restaurant-list');
   const district = document.getElementById('district-select').value;
   const statusFilter = document.getElementById('status-filter').value;
   const search = document.getElementById('search-input').value.trim().toLowerCase();
 
-  // No district selected - show instruction
-  if (!district) {
-    list.innerHTML = `
-      <div class="empty-state">
-        <i class="👆"></i>
-        請先選擇地區<br/>
-        <small>選擇地區後將自動載入該區餐廳</small>
-      </div>`;
-    document.getElementById('visible-count').textContent = '0';
-    return;
-  }
+  let filtered = allRestaurants;
 
-  // Load district data if not cached
-  let filtered = await loadDistrictData(district);
-
-  // Apply additional filters
+  if (district) filtered = filtered.filter(r => r.district === district);
   if (filterLate) filtered = filtered.filter(r => r.is_late_night);
   if (filterEarly) filtered = filtered.filter(r => r.is_early);
   if (statusFilter) {
@@ -938,7 +870,7 @@ async function renderRestaurantList() {
   document.getElementById('visible-count').textContent = filtered.length;
 
   if (filtered.length === 0) {
-    list.innerHTML = `<div class="empty-state"><i class="🍽️"></i>沒有餐廳</div>`;
+    list.innerHTML = `<div class="empty-state"><i class="fa-solid fa-utensils"></i>沒有餐廳</div>`;
     return;
   }
 
@@ -949,6 +881,7 @@ async function renderRestaurantList() {
     const tags = [];
     if (r.is_late_night) tags.push('<span class="rest-tag tag-late">🌙 宵夜</span>');
     if (r.is_early) tags.push('<span class="rest-tag tag-early">🌅 早市</span>');
+    // Support both simplified and traditional Chinese
     const status = r.status || '';
     if (status === '已認領' || status === '己認領') tags.push('<span class="rest-tag tag-claimed">✅ 已認領</span>');
     if (status === '已進駐' || status === '己進駐') tags.push('<span class="rest-tag tag-进驻">🏠 已進駐</span>');
@@ -961,7 +894,7 @@ async function renderRestaurantList() {
           ${isSelected ? 'checked' : ''}
           onclick="event.stopPropagation(); toggleRest('${r.poiId}')" />
         <div class="rest-name">${escapeHtml(r.name)}</div>
-        <div class="rest-district-badge">${r.district || district}</div>
+        <div class="rest-district-badge">${r.district}</div>
       </div>
       ${tags.length > 0 ? `<div class="rest-tags">${tags.join('')}</div>` : ''}
       <div class="rest-address">${escapeHtml(r.address || '')}</div>
@@ -991,12 +924,7 @@ function toggleFilter(type) {
 }
 
 function toggleRest(poiId) {
-  // Search through all cached district data
-  let r = null;
-  for (const district in districtCache) {
-    r = districtCache[district].find(x => x.poiId === poiId);
-    if (r) break;
-  }
+  const r = allRestaurants.find(x => x.poiId === poiId);
   if (!r) return;
 
   if (selectedRestaurants.has(poiId)) {
@@ -1027,14 +955,13 @@ function toggleRest(poiId) {
   updateSelectionUI();
 }
 
-async function selectAllVisible() {
+function selectAllVisible() {
   const district = document.getElementById('district-select').value;
-  if (!district) { showToast('⚠️ 請先選擇地區'); return; }
-  
   const statusFilter = document.getElementById('status-filter').value;
   const search = document.getElementById('search-input').value.trim().toLowerCase();
 
-  let filtered = districtCache[district] || await loadDistrictData(district);
+  let filtered = allRestaurants;
+  if (district) filtered = filtered.filter(r => r.district === district);
   if (filterLate) filtered = filtered.filter(r => r.is_late_night);
   if (filterEarly) filtered = filtered.filter(r => r.is_early);
   if (statusFilter === '未處理') filtered = filtered.filter(r => !r.status || r.status === 'None' || r.status === '');
@@ -1058,7 +985,8 @@ function deselectAllVisible() {
   const statusFilter = document.getElementById('status-filter').value;
   const search = document.getElementById('search-input').value.trim().toLowerCase();
 
-  let filtered = districtCache[district] || [];
+  let filtered = allRestaurants;
+  if (district) filtered = filtered.filter(r => r.district === district);
   if (filterLate) filtered = filtered.filter(r => r.is_late_night);
   if (filterEarly) filtered = filtered.filter(r => r.is_early);
   if (statusFilter === '未處理') filtered = filtered.filter(r => !r.status || r.status === 'None' || r.status === '');
@@ -1109,7 +1037,7 @@ function updateSelectionUI() {
         <div class="route-stop-addr">${escapeHtml(s.address || '')}</div>
       </div>
       <button class="route-stop-del" onclick="removeFromRoute('${s.poiId}')">
-        <i class="❌"></i>
+        <i class="fa-solid fa-xmark"></i>
       </button>
     </div>
   `).join('');
@@ -1137,7 +1065,7 @@ function getCurrentLocation() {
       if (document.getElementById('view-map').classList.contains('active') && map) {
         L.marker([lat, lng], {
           icon: L.divIcon({
-            html: '<div style="background:#22c55e;color:white;width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;border:3px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.3);"><i class="👤"></i></div>',
+            html: '<div style="background:#22c55e;color:white;width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;border:3px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.3);"><i class="fa-solid fa-user"></i></div>',
             className: '', iconSize: [28, 28], iconAnchor: [14, 14]
           })
         }).addTo(map).bindPopup('📍 我的位置').openPopup();
@@ -1194,7 +1122,7 @@ function renderRouteStops() {
         <div class="route-stop-addr">${escapeHtml(s.address || '')}</div>
       </div>
       <button class="route-stop-del" onclick="removeFromRoute('${s.poiId}')">
-        <i class="❌"></i>
+        <i class="fa-solid fa-xmark"></i>
       </button>
     </div>
   `).join('');
@@ -1236,82 +1164,73 @@ async function drawRoute() {
 }
 
 async function calculateRoute() {
-  try {
-    if (routeStops.length < 2) return;
+  if (routeStops.length < 2) return;
 
-    // FIRST: Draw straight-line immediately (no external dependencies!)
+  const coords = routeStops.map(s => `[${s.lng}, ${s.lat}]`).join(',');
+  // Try primary OSRM server first
+  const osrmUrls = [
+    `https://router.project-osrm.org/route/v1/foot/${coords}?overview=full&geometries=geojson`,
+    `https://routing.openstreetmap.de/routed-foot/route/v1/foot/${coords}?overview=full&geometries=geojson`
+  ];
+
+  let route = null;
+  for (const url of osrmUrls) {
+    try {
+      const resp = await fetch(url, { signal: AbortSignal.timeout(8000) });
+      if (!resp.ok) continue;
+      const data = await resp.json();
+      if (data.routes && data.routes[0]) {
+        route = data.routes[0];
+        break;
+      }
+    } catch (e) {
+      console.warn('OSRM error:', url, e.message);
+      continue;
+    }
+  }
+
+  if (!route) {
+    // Fallback: straight-line distance
     let totalDist = 0;
     for (let i = 1; i < routeStops.length; i++) {
       const d = Math.hypot(
         routeStops[i].lat - routeStops[i-1].lat,
         routeStops[i].lng - routeStops[i-1].lng
       );
-      totalDist += d * 111;
+      totalDist += d * 111; // rough km conversion
     }
     const distKm = totalDist.toFixed(2);
-    const walkTime = Math.round(totalDist / 5 * 60);
+    const walkTime = Math.round(totalDist / 5 * 60); // 5km/h walking
 
     if (routeLayer) map.removeLayer(routeLayer);
+    // Draw straight lines as fallback
     const latlngs = routeStops.map(s => [s.lat, s.lng]);
     routeLayer = L.polyline(latlngs, {
-      color: '#9333ea', weight: 4, opacity: 0.8, dashArray: '12, 8'
+      color: '#2563eb', weight: 3, opacity: 0.7, dashArray: '8, 8'
     }).addTo(map);
+
     document.getElementById('route-info-panel').classList.add('show');
-    document.getElementById('stat-dist').textContent = distKm + ' km (直線)';
-    document.getElementById('stat-time').textContent = walkTime + ' min (估算)';
-    showToast('📍 直線距離已顯示');
+    document.getElementById('stat-dist').textContent = distKm + ' (直線)';
+    document.getElementById('stat-time').textContent = walkTime;
+    showToast(`⚠️ 路線服務不可用，顯示直線距離`);
+    return;
+  }
 
-    // SECOND: Try OSRM in background (7 second timeout)
-    const coords = routeStops.map(s => `${s.lng},${s.lat}`).join(';');
-    try {
-      const resp = await fetch(
-        `https://router.project-osrm.org/route/v1/foot/${coords}?overview=full&geometries=geojson`,
-        { signal: AbortSignal.timeout(7000) }
-      );
-      if (resp.ok) {
-        const data = await resp.json();
-        if (data.routes && data.routes[0]) {
-          const r = data.routes[0];
-          const realDist = (r.distance / 1000).toFixed(2);
-          const realTime = Math.round(r.duration / 60);
-          if (routeLayer) map.removeLayer(routeLayer);
-          routeLayer = L.geoJSON(r.geometry, {
-            style: { color: '#2563eb', weight: 4, opacity: 0.8 }
-          }).addTo(map);
-          document.getElementById('stat-dist').textContent = realDist + ' km';
-          document.getElementById('stat-time').textContent = realTime + ' min';
-          showToast('✅ 路線已計算：' + realDist + 'km / 約' + realTime + '分鐘');
-          return;
-        }
-      }
-    } catch (e) { /* OSRM failed, keep straight line */ }
+  const distance = (route.distance / 1000).toFixed(2);
+  const duration = Math.round(route.duration / 60);
 
-    // THIRD: OSRM also failed - try alternate server
-    try {
-      const resp2 = await fetch(
-        `https://routing.openstreetmap.de/routed-foot/route/v1/foot/${coords}?overview=full&geometries=geojson`,
-        { signal: AbortSignal.timeout(7000) }
-      );
-      if (resp2.ok) {
-        const data2 = await resp2.json();
-        if (data2.routes && data2.routes[0]) {
-          const r = data2.routes[0];
-          const realDist = (r.distance / 1000).toFixed(2);
-          const realTime = Math.round(r.duration / 60);
-          if (routeLayer) map.removeLayer(routeLayer);
-          routeLayer = L.geoJSON(r.geometry, {
-            style: { color: '#2563eb', weight: 4, opacity: 0.8 }
-          }).addTo(map);
-          document.getElementById('stat-dist').textContent = realDist + ' km';
-          document.getElementById('stat-time').textContent = realTime + ' min';
-          showToast('✅ 路線已計算：' + realDist + 'km / 約' + realTime + '分鐘');
-          return;
-        }
-      }
-    } catch (e) { /* alternate also failed, keep straight line */ }
+  // Draw polyline
+  if (routeLayer) map.removeLayer(routeLayer);
+  routeLayer = L.geoJSON(route.geometry, {
+    style: { color: '#2563eb', weight: 4, opacity: 0.8 }
+  }).addTo(map);
 
-    // All services failed - stay with straight line (already drawn above)
-    showToast('📍 顯示直線距離（網絡路線服務不可用）');
+  // Update stats
+  document.getElementById('route-info-panel').classList.add('show');
+  document.getElementById('stat-dist').textContent = distance;
+  document.getElementById('stat-time').textContent = duration;
+
+    showToast(`✅ 路線已計算：${distance}km / 約${duration}分鐘`);
   } catch (e) {
     showToast('❌ 路線計算失敗');
     console.error(e);
@@ -1319,13 +1238,9 @@ async function calculateRoute() {
 }
 
 async function calculateAndShowRoute() {
-  if (selectedRestaurants.size < 2) {
-    showToast('⚠️ 請先選擇2間或以上餐廳');
-    return;
-  }
   switchToMap();
-  // calculateRoute will draw immediately (straight line first)
-  setTimeout(() => calculateRoute(), 100);
+  await new Promise(r => setTimeout(r, 300));
+  await calculateRoute();
 }
 
 function reoptimizeRoute() {
@@ -1366,11 +1281,7 @@ function clearAllRoute() {
 // GEOCODING (single)
 // ══════════════════════════════════════════
 async function geocodeOne(poiId) {
-  let r = null;
-  for (const district in districtCache) {
-    r = districtCache[district].find(x => x.poiId === poiId);
-    if (r) break;
-  }
+  const r = allRestaurants.find(x => x.poiId === poiId);
   if (!r || !r.address) return;
 
   try {
