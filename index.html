@@ -536,60 +536,9 @@
 
     /* Map responsive */
     @media (max-width: 768px) {
-      #view-selection {
-        flex-direction: column !important;
-        height: 100dvh;
-        overflow: hidden;
-      }
-      #filter-panel {
-        width: 100% !important;
-        min-width: 0 !important;
-        height: 100dvh !important;
-        flex: 0 0 100dvh !important;
-        flex-direction: column !important;
-        border-right: none !important;
-        border-bottom: none !important;
-        border-top: 1px solid var(--border);
-        box-shadow: none !important;
-        overflow: hidden !important;
-        display: flex !important;
-      }
-      #filter-header {
-        flex-shrink: 0;
-      }
-      #filter-controls {
-        flex-shrink: 0;
-        max-height: 30dvh;
-        overflow-y: auto;
-      }
-      #gps-bar, #selection-bar, #action-bar {
-        flex-shrink: 0;
-      }
-      #restaurant-list {
-        flex: 1 !important;
-        min-height: 0 !important;
-        overflow-y: auto !important;
-        -webkit-overflow-scrolling: touch;
-        height: auto !important;
-      }
-      #filter-footer {
-        flex-shrink: 0;
-      }
-      /* Right panel hidden on mobile */
-      #view-selection > div:last-child {
-        display: none !important;
-      }
+      #filter-panel { width: 100%; height: auto; flex: 1; }
+      #view-selection { flex-direction: column; }
       #route-sidebar { width: 100%; height: 200px; }
-      #floating-route-btn {
-        bottom: 20px;
-        right: 20px;
-        padding: 12px 18px;
-        font-size: 14px;
-      }
-      #back-btn {
-        padding: 6px 12px;
-        font-size: 12px;
-      }
     }
   </style>
 </head>
@@ -801,42 +750,18 @@ let filterEarly = false;
 // INIT
 // ══════════════════════════════════════════
 async function init() {
-  showToast('🚀 載入餐廳數據中...（請稍候）');
+  showToast('🚀 載入餐廳數據中...');
   try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 30000);
-    
-    const resp = await fetch(`${API_BASE}/api/restaurants`, {
-      signal: controller.signal
-    });
-    clearTimeout(timeout);
-    
+    const resp = await fetch(`${API_BASE}/api/restaurants`);
     if (!resp.ok) throw new Error('API error: ' + resp.status);
-    
-    const text = await resp.text();
-    allRestaurants = JSON.parse(text);
-    
-    if (!Array.isArray(allRestaurants) || allRestaurants.length === 0) {
-      throw new Error('數據格式錯誤或為空');
-    }
-    
+    allRestaurants = await resp.json();
     document.getElementById('total-db-count').textContent = allRestaurants.length;
     loadDistrictOptions();
     renderRestaurantList();
     showToast(`✅ ${allRestaurants.length} 間餐廳已載入`);
   } catch (e) {
-    if (e.name === 'AbortError') {
-      showToast('❌ 載入超時，請檢查網絡連線');
-    } else {
-      showToast('❌ 無法載入數據庫：' + e.message);
-    }
-    console.error('Init error:', e);
-    document.getElementById('restaurant-list').innerHTML = `
-      <div class="empty-state">
-        <i class="fa-solid fa-circle-exclamation"></i>
-        載入失敗：${e.message}<br/>
-        <small>請檢查網絡或重新整理頁面</small>
-      </div>`;
+    showToast('❌ 無法載入數據庫，請確保 Flask 在 port 19801 運行');
+    console.error(e);
   }
 }
 
@@ -1106,12 +1031,9 @@ function switchToSelection() {
 // ══════════════════════════════════════════
 function initMap() {
   if (map) { map.invalidateSize(); return; }
-  map = L.map('map', { zoomControl: true, attributionControl: true }).setView([22.3193, 114.1694], 12);
-  
-  // CartoDB tiles
-  L.tileLayer('https://basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png', {
-    attribution: '© CartoDB, © OpenStreetMap',
-    maxZoom: 19
+  map = L.map('map').setView([22.3193, 114.1694], 12);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '© OpenStreetMap'
   }).addTo(map);
 }
 
@@ -1170,66 +1092,37 @@ async function calculateRoute() {
   if (routeStops.length < 2) return;
 
   const coords = routeStops.map(s => `[${s.lng}, ${s.lat}]`).join(',');
-  // Try primary OSRM server first
-  const osrmUrls = [
-    `https://router.project-osrm.org/route/v1/foot/${coords}?overview=full&geometries=geojson`,
-    `https://routing.openstreetmap.de/routed-foot/route/v1/foot/${coords}?overview=full&geometries=geojson`
-  ];
+  const url = `https://router.project-osrm.org/route/v1/foot/${coords}?overview=full&geometries=geojson`;
 
-  let route = null;
-  for (const url of osrmUrls) {
-    try {
-      const resp = await fetch(url, { signal: AbortSignal.timeout(8000) });
-      if (!resp.ok) continue;
-      const data = await resp.json();
-      if (data.routes && data.routes[0]) {
-        route = data.routes[0];
-        break;
-      }
-    } catch (e) {
-      console.warn('OSRM error:', url, e.message);
-      continue;
+  try {
+    const resp = await fetch(url);
+    const data = await resp.json();
+
+    if (!data.routes || !data.routes[0]) {
+      showToast('❌ 路線規劃失敗');
+      return;
     }
-  }
 
-  if (!route) {
-    // Fallback: straight-line distance
-    let totalDist = 0;
-    for (let i = 1; i < routeStops.length; i++) {
-      const d = Math.hypot(
-        routeStops[i].lat - routeStops[i-1].lat,
-        routeStops[i].lng - routeStops[i-1].lng
-      );
-      totalDist += d * 111;
-    }
-    const distKm = totalDist.toFixed(2);
-    const walkTime = Math.round(totalDist / 5 * 60);
+    const route = data.routes[0];
+    const distance = (route.distance / 1000).toFixed(2);
+    const duration = Math.round(route.duration / 60);
 
+    // Draw polyline
     if (routeLayer) map.removeLayer(routeLayer);
-    const latlngs = routeStops.map(s => [s.lat, s.lng]);
-    routeLayer = L.polyline(latlngs, {
-      color: '#2563eb', weight: 3, opacity: 0.7, dashArray: '8, 8'
+    routeLayer = L.geoJSON(route.geometry, {
+      style: { color: '#2563eb', weight: 4, opacity: 0.8 }
     }).addTo(map);
 
+    // Update stats
     document.getElementById('route-info-panel').classList.add('show');
-    document.getElementById('stat-dist').textContent = distKm + ' (直線)';
-    document.getElementById('stat-time').textContent = walkTime;
-    showToast(`⚠️ 路線服務不可用，顯示直線距離`);
-    return;
+    document.getElementById('stat-dist').textContent = distance;
+    document.getElementById('stat-time').textContent = duration;
+
+    showToast(`✅ 路線已計算：${distance}km / 約${duration}分鐘`);
+  } catch (e) {
+    showToast('❌ 路線計算失敗');
+    console.error(e);
   }
-
-  const distance = (route.distance / 1000).toFixed(2);
-  const duration = Math.round(route.duration / 60);
-
-  if (routeLayer) map.removeLayer(routeLayer);
-  routeLayer = L.geoJSON(route.geometry, {
-    style: { color: '#2563eb', weight: 4, opacity: 0.8 }
-  }).addTo(map);
-
-  document.getElementById('route-info-panel').classList.add('show');
-  document.getElementById('stat-dist').textContent = distance;
-  document.getElementById('stat-time').textContent = duration;
-  showToast(`✅ 路線已計算：${distance}km / 約${duration}分鐘`);
 }
 
 async function calculateAndShowRoute() {
