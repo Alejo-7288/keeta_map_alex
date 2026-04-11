@@ -237,6 +237,11 @@
     .tag-late { background: #1e293b; color: #fbbf24; }
     .tag-early { background: #fef3c7; color: #92400e; }
     .tag-claimed { background: #d1fae5; color: #065f46; }
+    .rest-cuisine {
+      font-size: 12px;
+      color: #64748b;
+      margin: 4px 0 4px 28px;
+    }
     .tag进驻 { background: #dbeafe; color: #1e40af; }
 
     .rest-address {
@@ -639,6 +644,13 @@
       </div>
 
       <div class="filter-group">
+        <label class="filter-label">餐廳類型</label>
+        <select id="cuisine-filter" onchange="renderRestaurantList()">
+          <option value="">全部類型</option>
+        </select>
+      </div>
+
+      <div class="filter-group">
         <label class="filter-label">時段標籤</label>
         <div class="toggle-row">
           <button class="toggle-btn" id="toggle-late" onclick="toggleFilter('late')">
@@ -854,6 +866,12 @@ function loadDistrictOptions() {
   const sel = document.getElementById('district-select');
   sel.innerHTML = '<option value="">全部地區</option>' +
     districts.map(d => `<option value="${d}">${d}</option>`).join('');
+  
+  // Populate cuisine filter
+  const cuisines = [...new Set(allRestaurants.map(r => r.cuisine).filter(Boolean))].sort();
+  const cuisineSel = document.getElementById('cuisine-filter');
+  cuisineSel.innerHTML = '<option value="">全部類型</option>' +
+    cuisines.map(c => `<option value="${c}">${c}</option>`).join('');
 }
 
 // ══════════════════════════════════════════
@@ -863,6 +881,7 @@ function renderRestaurantList() {
   const list = document.getElementById('restaurant-list');
   const district = document.getElementById('district-select').value;
   const statusFilter = document.getElementById('status-filter').value;
+  const cuisineFilter = document.getElementById('cuisine-filter').value;
   const search = document.getElementById('search-input').value.trim().toLowerCase();
 
   let filtered = allRestaurants;
@@ -874,6 +893,7 @@ function renderRestaurantList() {
     if (statusFilter === '未處理') filtered = filtered.filter(r => !r.status || r.status === 'None' || r.status === '');
     else filtered = filtered.filter(r => r.status === statusFilter);
   }
+  if (cuisineFilter) filtered = filtered.filter(r => r.cuisine && r.cuisine.includes(cuisineFilter));
   if (search) filtered = filtered.filter(r => r.name.toLowerCase().includes(search));
 
   document.getElementById('visible-count').textContent = filtered.length;
@@ -906,6 +926,7 @@ function renderRestaurantList() {
         <div class="rest-district-badge">${r.district}</div>
       </div>
       ${tags.length > 0 ? `<div class="rest-tags">${tags.join('')}</div>` : ''}
+      ${r.cuisine ? `<div class="rest-cuisine">🍜 ${escapeHtml(r.cuisine)}</div>` : ''}
       <div class="rest-address">${escapeHtml(r.address || '')}</div>
       ${r.hours ? `<div class="rest-meta">${r.hours.split(';')[0]}</div>` : ''}
       <div class="rest-footer">

@@ -96,6 +96,7 @@ def load_restaurants():
                     "is_late_night": bool(g("is_late_night")),
                     "is_early": bool(g("is_early")),
                     "status": str(g("STATUS") or "").strip(),
+                    "cuisine": str(g("菜系") or "").strip(),
                 })
             _restaurants_cache = restaurants
             print(f"✅ Loaded {len(restaurants)} restaurants from Excel (fallback)")
